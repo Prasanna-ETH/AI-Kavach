@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Security Scan Report</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      --critical: #ef4444;
+      --high: #f97316;
+      --medium: #eab308;
+      --low: #3b82f6;
+      --pass: #22c55e;
+      --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      margin: 0;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .header h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 2.25rem;
+      color: #38bdf8;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .card .title {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .card .value {
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-critical { background: var(--critical); color: #fff; }
+    .badge-high { background: var(--high); color: #fff; }
+    .badge-medium { background: var(--medium); color: #000; }
+    .badge-low { background: var(--low); color: #fff; }
+    .badge-pass { background: var(--pass); color: #fff; }
+    
+    .owasp-tag {
+      background: #334155;
+      color: #38bdf8;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      margin-right: 0.5rem;
+    }
+
+    .findings-section {
+      margin-top: 2rem;
+    }
+    .finding-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .finding-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+    .finding-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .prompt-box, .response-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 0.5rem;
+      color: #e2e8f0;
+    }
+    .reasoning {
+      background: rgba(248, 113, 113, 0.1);
+      border-left: 4px solid var(--critical);
+      padding: 0.75rem 1rem;
+      margin-top: 1rem;
+      border-radius: 0 4px 4px 0;
+      color: #fca5a5;
+    }
+    .footer {
+      text-align: center;
+      color: var(--text-muted);
+      margin-top: 3rem;
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🛡️ LLM Security Scan Report</h1>
+      <p style="color: var(--text-muted); margin: 0;">Target: <code>{{ result.target_url }}</code></p>
+    </div>
+
+    <div class="meta-grid">
+      <div class="card">
+        <div class="title">Total Payloads</div>
+        <div class="value">{{ result.total_payloads }}</div>
+      </div>
+      <div class="card">
+        <div class="title">Vulnerabilities Flagged</div>
+        <div class="value" style="color: {% if result.vulnerable_count > 0 %}var(--critical){% else %}var(--pass){% endif %};">
+          {{ result.vulnerable_count }}
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">Duration</div>
+        <div class="value">{{ result.duration_seconds | round(2) }}s</div>
+      </div>
+      <div class="card">
+        <div class="title">Scan Status</div>
+        <div class="value" style="font-size: 1.25rem;">
+          {% if result.circuit_broken %}
+            <span style="color: var(--critical);">⚡ Circuit Broken</span>
+          {% else %}
+            <span style="color: var(--pass);">✓ Completed</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <h2>Breakdown by Severity</h2>
+    <div class="meta-grid">
+      <div class="card">
+        <div class="title">Critical</div>
+        <div class="value" style="color: var(--critical);">{{ result.severity_counts.CRITICAL }}</div>
+      </div>
+      <div class="card">
+        <div class="title">High</div>
+        <div class="value" style="color: var(--high);">{{ result.severity_counts.HIGH }}</div>
+      </div>
+      <div class="card">
+        <div class="title">Medium</div>
+        <div class="value" style="color: var(--medium);">{{ result.severity_counts.MEDIUM }}</div>
+      </div>
+      <div class="card">
+        <div class="title">Low</div>
+        <div class="value" style="color: var(--low);">{{ result.severity_counts.LOW }}</div>
+      </div>
+    </div>
+
+    <div class="findings-section">
+      <h2>Scan Findings Details</h2>
+
+      {% for finding in result.findings %}
+      <div class="finding-item">
+        <div class="finding-header">
+          <div class="finding-title">
+            <span class="owasp-tag">{{ finding.payload.owasp_id }}</span>
+            <code>[{{ finding.payload.id }}]</code> {{ finding.payload.category }}
+          </div>
+          <div>
+            {% if finding.vulnerable %}
+              <span class="badge badge-{{ finding.severity.lower() }}">{{ finding.severity }} VULNERABLE</span>
+            {% else %}
+              <span class="badge badge-pass">PASSED</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div>
+          <strong>Judge Type:</strong> <code>{{ finding.judge_type }}</code> |
+          <strong>Confidence:</strong> {{ (finding.confidence * 100) | round(0) }}%
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <strong>Attack Prompt:</strong>
+          <div class="prompt-box">{{ finding.payload.prompt }}</div>
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <strong>Target Model Response:</strong>
+          <div class="response-box">{{ finding.response_text or "(No response / Error)" }}</div>
+        </div>
+
+        {% if finding.reasoning %}
+        <div class="reasoning">
+          <strong>Judge Reasoning:</strong> {{ finding.reasoning }}
+        </div>
+        {% endif %}
+
+        {% if finding.error %}
+        <div class="reasoning" style="border-left-color: var(--medium); color: var(--medium);">
+          <strong>Error Details:</strong> {{ finding.error }}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="footer">
+      Generated on {{ result.end_time }} by OWASP Top 10 for LLM Applications Security Scanner
+    </div>
+  </div>
+</body>
+</html>
