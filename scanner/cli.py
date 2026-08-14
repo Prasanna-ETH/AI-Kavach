@@ -1,4 +1,4 @@
-"""Typer CLI interface for LLM Security Scanner with asyncio concurrency and structured logging."""
+"""Typer CLI interface for LLM Security Scanner with single-turn and multi-turn adversarial attack capabilities."""
 
 import asyncio
 import logging
@@ -10,11 +10,12 @@ from rich.panel import Panel
 from rich.table import Table
 
 from scanner.adapters.rest_adapter import RESTAdapter
-from scanner.config import load_payloads
+from scanner.attacker.attacker_llm import AttackerLLM
+from scanner.config import load_multiturn_payloads, load_payloads
 from scanner.engine import ScanEngine
-from scanner.models import Finding, Payload
+from scanner.models import Finding, MultiTurnFinding, MultiTurnPayload, Payload
 from scanner.report.html_report import generate_html_report
-from scanner.report.json_report import generate_json_report
+from scanner.report.json_report import generate_json_report, generate_multiturn_json_report
 
 app = typer.Typer(
     name="scanner",
@@ -32,7 +33,6 @@ def setup_logging(log_file_path: Path) -> logging.Logger:
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
 
-    # File Handler for scan.log
     file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
     file_formatter = logging.Formatter(
         "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
@@ -41,7 +41,6 @@ def setup_logging(log_file_path: Path) -> logging.Logger:
     file_handler.setFormatter(file_formatter)
     file_handler.setLevel(logging.INFO)
 
-    # Avoid duplicate handlers if re-initialized
     root_logger.handlers = [h for h in root_logger.handlers if not isinstance(h, logging.FileHandler)]
     root_logger.addHandler(file_handler)
 
@@ -128,7 +127,7 @@ def scan(
         help="Directory to save report.html, report.json, and scan.log",
     ),
 ) -> None:
-    """Execute security scan asynchronously against target LLM API endpoint."""
+    """Execute single-turn security scan asynchronously against target LLM API endpoint."""
     if not i_have_permission:
         console.print(
             Panel(
@@ -206,7 +205,6 @@ def scan(
             f"[{index}/{total}] [{payload.owasp_id}] [bold]{payload.id}[/bold] ({payload.category}) -> {status_str}"
         )
 
-    # Execute async scan
     result = asyncio.run(engine.run(payloads, progress_callback=progress_callback))
 
     # Save reports
@@ -233,6 +231,172 @@ def scan(
     summary_table.add_row("Low Severity", str(result.severity_counts.get("LOW", 0)))
     summary_table.add_row("Circuit Broken", "Yes" if result.circuit_broken else "No")
     summary_table.add_row("Scan Duration", f"{result.duration_seconds:.2f} seconds")
+
+    console.print(summary_table)
+    console.print("\n[bold green]Reports & Logs saved to:[/bold green]")
+    console.print(f"  - HTML Report: [yellow]{html_path.resolve()}[/yellow]")
+    console.print(f"  - JSON Report: [yellow]{json_path.resolve()}[/yellow]")
+    console.print(f"  - Structured Log: [yellow]{log_file.resolve()}[/yellow]\n")
+
+
+@app.command(name="scan-multiturn")
+def scan_multiturn(
+    url: str = typer.Option(..., "--url", "-u", help="Target API endpoint URL"),
+    body_template: str = typer.Option(
+        ...,
+        "--body-template",
+        "-b",
+        help="JSON body string template with {{PROMPT}} placeholder",
+    ),
+    response_field: str = typer.Option(
+        "message.content",
+        "--response-field",
+        "-r",
+        help="Dotted path key to extract model response text",
+    ),
+    attacker_model: str = typer.Option(
+        "qwen2.5:0.5b",
+        "--attacker-model",
+        help="Ollama model for the adversarial Attacker LLM driver",
+    ),
+    judge_model: str = typer.Option(
+        "qwen2.5:0.5b",
+        "--judge-model",
+        help="Ollama model for the Multi-Turn Judge evaluator",
+    ),
+    max_turns: int = typer.Option(
+        4,
+        "--max-turns",
+        "-m",
+        help="Maximum turns per conversation (hard capped at 8 max)",
+    ),
+    auth_header: Optional[List[str]] = typer.Option(
+        None,
+        "--auth-header",
+        "-a",
+        help="Custom HTTP headers",
+    ),
+    packs: Optional[str] = typer.Option(
+        None,
+        "--packs",
+        "-p",
+        help="Comma-separated multi-turn payload pack names",
+    ),
+    delay: float = typer.Option(
+        0.5,
+        "--delay",
+        "-d",
+        help="Delay in seconds between request turns",
+    ),
+    i_have_permission: bool = typer.Option(
+        False,
+        "--i-have-permission",
+        help="Safety authorization gate. MUST be explicitly provided to execute scans.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("scan_results"),
+        "--output-dir",
+        "-o",
+        help="Directory to save multiturn_report.json, report.html, and scan.log",
+    ),
+) -> None:
+    """Execute multi-turn adversarial attack scan against target LLM API endpoint."""
+    if not i_have_permission:
+        console.print(
+            Panel(
+                "[bold red]SAFETY GATE BLOCKED[/bold red]\n\n"
+                "You must explicitly provide the [yellow]--i-have-permission[/yellow] flag to confirm you have "
+                "authorization to perform security scans against the target endpoint.",
+                title="Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    log_file = output_dir / "scan.log"
+    logger = setup_logging(log_file)
+
+    logger.info(f"Multi-Turn Security Scanner initialized against target: {url}")
+    logger.info(f"Attacker Model: {attacker_model} | Judge Model: {judge_model} | Max Turns: {max_turns}")
+
+    console.print(
+        Panel(
+            f"[bold cyan]Multi-Turn Adversarial Attack Scanner[/bold cyan]\n"
+            f"Target: [yellow]{url}[/yellow] | Attacker Model: [bold green]{attacker_model}[/bold green]",
+            border_style="cyan",
+        )
+    )
+
+    pack_list = [p.strip() for p in packs.split(",")] if packs else None
+
+    try:
+        mt_payloads = load_multiturn_payloads(pack_names=pack_list)
+        for p in mt_payloads:
+            p.max_turns = min(max_turns, 8)
+    except Exception as err:
+        logger.error(f"Failed to load multi-turn payload packs: {err}")
+        console.print(f"[bold red]Failed to load multi-turn payload packs:[/bold red] {err}")
+        raise typer.Exit(code=1)
+
+    if not mt_payloads:
+        console.print("[yellow]No multi-turn payloads found matching criteria.[/yellow]")
+        raise typer.Exit(code=0)
+
+    headers = parse_headers(auth_header)
+    adapter = RESTAdapter(
+        url=url,
+        body_template=body_template,
+        response_field=response_field,
+        headers=headers,
+    )
+
+    attacker = AttackerLLM(model=attacker_model)
+    engine = ScanEngine(adapter=adapter, delay=delay)
+
+    console.print(
+        f"Loaded [bold green]{len(mt_payloads)}[/bold green] multi-turn attack scenarios. Executing conversation loops...\n"
+    )
+
+    def progress_callback(
+        p_idx: int,
+        p_total: int,
+        payload: MultiTurnPayload,
+        turn: int,
+        t_max: int,
+        status_msg: str,
+        finding: Optional[MultiTurnFinding],
+    ) -> None:
+        if finding is None:
+            console.print(f"[{payload.owasp_id}] [bold]{payload.id}[/bold] Turn {turn}/{t_max}: {status_msg}")
+        else:
+            if finding.vulnerable:
+                status_str = f"[bold red]VULNERABLE (Exploited at Turn {finding.succeeded_at_turn})[/bold red]"
+            else:
+                status_str = "[bold green]PASSED (Target Remained Safe)[/bold green]"
+            console.print(f"[{payload.owasp_id}] [bold]{payload.id}[/bold] Final Result -> {status_str}\n")
+
+    findings = asyncio.run(engine.run_multiturn_scan(attacker, mt_payloads, progress_callback=progress_callback))
+
+    json_path = generate_multiturn_json_report(findings, output_dir / "multiturn_report.json")
+    html_path = generate_html_report(result=None, output_path=output_dir / "report.html", multiturn_findings=findings, target_url=url)
+
+    console.print("\n" + "=" * 60)
+    console.print("[bold cyan]MULTI-TURN SCAN SUMMARY[/bold cyan]")
+    console.print("=" * 60)
+
+    summary_table = Table(show_header=True, header_style="bold magenta")
+    summary_table.add_column("Metric", style="cyan")
+    summary_table.add_column("Value", style="white")
+
+    vuln_count = sum(1 for f in findings if f.vulnerable)
+
+    summary_table.add_row("Target Endpoint", url)
+    summary_table.add_row("Attacker Model", attacker_model)
+    summary_table.add_row("Total Scenarios Tested", str(len(findings)))
+    summary_table.add_row(
+        "Vulnerabilities Flagged",
+        f"[bold red]{vuln_count}[/bold red]" if vuln_count > 0 else "[bold green]0[/bold green]",
+    )
 
     console.print(summary_table)
     console.print("\n[bold green]Reports & Logs saved to:[/bold green]")

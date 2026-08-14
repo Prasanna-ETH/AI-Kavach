@@ -36,13 +36,18 @@ Start the included vulnerable target endpoint at `http://localhost:5000/api/chat
 uv run python targets/vulnerable_ollama_wrapper.py
 ```
 
-### 2. Run Security Scan
+### 2. Run Single-Turn Security Scan
 
-Execute the scanner with the required `--i-have-permission` safety gate:
-
-**Single-line command (PowerShell / Command Prompt):**
+Execute single-turn scan with `--i-have-permission`:
 ```powershell
 uv run scanner scan --url "http://localhost:5000/api/chat" --body-template '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"{{PROMPT}}"}]}' --response-field "message.content" --i-have-permission
+```
+
+### 3. Run Multi-Turn Adversarial Attack Scan
+
+Execute automated Red-Team multi-turn social engineering & escalation attacks:
+```powershell
+uv run scanner scan-multiturn --url "http://localhost:5000/api/chat" --body-template '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"{{PROMPT}}"}]}' --response-field "message.content" --attacker-model qwen2.5:0.5b --max-turns 4 --i-have-permission
 ```
 
 > **Note for PowerShell users:** In PowerShell, line continuation uses the backtick character (`` ` ``), **not** backslash (`\`). If splitting across lines in PowerShell, use `` ` `` at the end of each line.

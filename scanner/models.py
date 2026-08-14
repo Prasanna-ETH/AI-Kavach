@@ -1,4 +1,4 @@
-"""Data models for payloads, scan findings, and execution results."""
+"""Data models for payloads, scan findings, execution results, and multi-turn conversations."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -127,4 +127,109 @@ class ScanResult:
             "circuit_broken": self.circuit_broken,
             "duration_seconds": self.duration_seconds,
             "findings": [f.to_dict() for f in self.findings],
+        }
+
+
+@dataclass
+class ConversationTurn:
+    """Represents a single message exchange in a multi-turn conversation.
+
+    Attributes:
+        turn_number: 1-based index of the dialogue turn.
+        role: "attacker" (red-team prompt) or "target" (model response).
+        content: Message text.
+        timestamp: Epoch timestamp of message creation.
+    """
+    turn_number: int
+    role: str
+    content: str
+    timestamp: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ConversationTurn instance to dictionary."""
+        return {
+            "turn_number": self.turn_number,
+            "role": self.role,
+            "content": self.content,
+            "timestamp": self.timestamp,
+        }
+
+
+@dataclass
+class MultiTurnPayload:
+    """Represents a multi-turn adversarial scenario.
+
+    Attributes:
+        id: Unique identifier (e.g., MT-001).
+        category: Vulnerability category name.
+        owasp_id: OWASP Top 10 for LLM Applications ID.
+        severity: Severity rating.
+        max_turns: Maximum conversation turns allowed (default 4).
+        opening_prompt: Initial prompt sent in turn 1.
+        escalation_strategy: Instruction for Attacker LLM strategy across turns.
+        stop_condition_hint: Description of what constitutes success for the judge.
+    """
+    id: str
+    category: str
+    owasp_id: str
+    severity: str
+    opening_prompt: str
+    escalation_strategy: str
+    stop_condition_hint: str
+    max_turns: int = 4
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert MultiTurnPayload instance to dictionary."""
+        return {
+            "id": self.id,
+            "category": self.category,
+            "owasp_id": self.owasp_id,
+            "severity": self.severity,
+            "max_turns": self.max_turns,
+            "opening_prompt": self.opening_prompt,
+            "escalation_strategy": self.escalation_strategy,
+            "stop_condition_hint": self.stop_condition_hint,
+        }
+
+
+@dataclass
+class MultiTurnFinding:
+    """Represents the evaluation outcome of a multi-turn attack scenario.
+
+    Attributes:
+        payload_id: MultiTurnPayload ID.
+        category: Vulnerability category.
+        owasp_id: Mapped OWASP ID.
+        vulnerable: Flag indicating if vulnerability was successfully exploited.
+        severity: Severity rating assigned.
+        confidence: Confidence score (0.0 to 1.0).
+        reasoning: Explanation for evaluation outcome.
+        full_transcript: Ordered list of ConversationTurn exchanges.
+        succeeded_at_turn: Turn number where vulnerability first appeared (or None).
+        error: Error details if execution failed.
+    """
+    payload_id: str
+    category: str
+    owasp_id: str
+    vulnerable: bool
+    severity: str
+    confidence: float
+    reasoning: str
+    full_transcript: List[ConversationTurn] = field(default_factory=list)
+    succeeded_at_turn: Optional[int] = None
+    error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert MultiTurnFinding instance to dictionary."""
+        return {
+            "payload_id": self.payload_id,
+            "category": self.category,
+            "owasp_id": self.owasp_id,
+            "vulnerable": self.vulnerable,
+            "severity": self.severity,
+            "confidence": self.confidence,
+            "reasoning": self.reasoning,
+            "succeeded_at_turn": self.succeeded_at_turn,
+            "error": self.error,
+            "full_transcript": [t.to_dict() for t in self.full_transcript],
         }
