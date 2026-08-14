@@ -1,5 +1,7 @@
-"""Typer CLI interface for LLM Security Scanner."""
+"""Typer CLI interface for LLM Security Scanner with asyncio concurrency and structured logging."""
 
+import asyncio
+import logging
 from pathlib import Path
 from typing import List, Optional
 import typer
@@ -21,6 +23,29 @@ app = typer.Typer(
 )
 
 console = Console()
+
+
+def setup_logging(log_file_path: Path) -> logging.Logger:
+    """Configure structured Python logging writing to scan.log file and console debug."""
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # File Handler for scan.log
+    file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
+    file_formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    file_handler.setFormatter(file_formatter)
+    file_handler.setLevel(logging.INFO)
+
+    # Avoid duplicate handlers if re-initialized
+    root_logger.handlers = [h for h in root_logger.handlers if not isinstance(h, logging.FileHandler)]
+    root_logger.addHandler(file_handler)
+
+    return logging.getLogger("scanner.cli")
 
 
 def parse_headers(header_args: Optional[List[str]]) -> dict[str, str]:
@@ -75,10 +100,16 @@ def scan(
         help="Comma-separated payload packs to execute (e.g., 'prompt_injection,jailbreak')",
     ),
     delay: float = typer.Option(
-        0.5,
+        0.0,
         "--delay",
         "-d",
-        help="Delay in seconds between requests",
+        help="Delay in seconds between requests per worker",
+    ),
+    concurrency: int = typer.Option(
+        5,
+        "--concurrency",
+        "-c",
+        help="Maximum simultaneous async HTTP requests",
     ),
     i_have_permission: bool = typer.Option(
         False,
@@ -94,10 +125,10 @@ def scan(
         Path("scan_results"),
         "--output-dir",
         "-o",
-        help="Directory to save report.html and report.json",
+        help="Directory to save report.html, report.json, and scan.log",
     ),
 ) -> None:
-    """Execute security scan against target LLM API endpoint."""
+    """Execute security scan asynchronously against target LLM API endpoint."""
     if not i_have_permission:
         console.print(
             Panel(
@@ -110,9 +141,16 @@ def scan(
         )
         raise typer.Exit(code=1)
 
+    log_file = output_dir / "scan.log"
+    logger = setup_logging(log_file)
+
+    logger.info(f"LLM Security Scanner initialized against target: {url}")
+    logger.info(f"Configuration: concurrency={concurrency}, delay={delay}s, use_llm_judge={use_llm_judge}")
+
     console.print(
         Panel(
-            f"[bold cyan]LLM Security Scanner[/bold cyan]\nTarget: [yellow]{url}[/yellow]",
+            f"[bold cyan]LLM Security Scanner (AsyncIO Engine)[/bold cyan]\n"
+            f"Target: [yellow]{url}[/yellow] | Concurrency: [bold green]{concurrency}[/bold green]",
             border_style="cyan",
         )
     )
@@ -122,6 +160,7 @@ def scan(
     try:
         payloads = load_payloads(pack_names=pack_list)
     except Exception as err:
+        logger.error(f"Failed to load payload packs: {err}")
         console.print(f"[bold red]Failed to load payload packs:[/bold red] {err}")
         raise typer.Exit(code=1)
 
@@ -140,14 +179,14 @@ def scan(
     engine = ScanEngine(
         adapter=adapter,
         delay=delay,
+        concurrency=concurrency,
         use_llm_judge=use_llm_judge,
     )
 
-    console.print(f"Loaded [bold green]{len(payloads)}[/bold green] attack payloads. Starting scan...\n")
+    console.print(f"Loaded [bold green]{len(payloads)}[/bold green] attack payloads. Starting async scan...\n")
 
     def progress_callback(index: int, total: int, payload: Payload, finding: Optional[Finding]) -> None:
         if finding is None:
-            # Started
             return
 
         if finding.error:
@@ -167,7 +206,8 @@ def scan(
             f"[{index}/{total}] [{payload.owasp_id}] [bold]{payload.id}[/bold] ({payload.category}) -> {status_str}"
         )
 
-    result = engine.run(payloads, progress_callback=progress_callback)
+    # Execute async scan
+    result = asyncio.run(engine.run(payloads, progress_callback=progress_callback))
 
     # Save reports
     json_path = generate_json_report(result, output_dir / "report.json")
@@ -195,9 +235,10 @@ def scan(
     summary_table.add_row("Scan Duration", f"{result.duration_seconds:.2f} seconds")
 
     console.print(summary_table)
-    console.print("\n[bold green]Reports saved to:[/bold green]")
-    console.print(f"  - HTML: [yellow]{html_path.resolve()}[/yellow]")
-    console.print(f"  - JSON: [yellow]{json_path.resolve()}[/yellow]\n")
+    console.print("\n[bold green]Reports & Logs saved to:[/bold green]")
+    console.print(f"  - HTML Report: [yellow]{html_path.resolve()}[/yellow]")
+    console.print(f"  - JSON Report: [yellow]{json_path.resolve()}[/yellow]")
+    console.print(f"  - Structured Log: [yellow]{log_file.resolve()}[/yellow]\n")
 
 
 if __name__ == "__main__":

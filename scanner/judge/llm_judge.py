@@ -48,8 +48,8 @@ class LLMJudge:
         self.timeout = timeout
         self.heuristic_judge = HeuristicJudge()
 
-    def evaluate(self, payload: Payload, response_text: str) -> Finding:
-        """Evaluate payload & target response using local LLM judge with heuristic fallback.
+    async def evaluate(self, payload: Payload, response_text: str) -> Finding:
+        """Evaluate payload & target response asynchronously using local LLM judge.
 
         Args:
             payload: Payload specification.
@@ -72,8 +72,8 @@ class LLMJudge:
         }
 
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                res = client.post(self.ollama_url, json=request_body)
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                res = await client.post(self.ollama_url, json=request_body)
                 res.raise_for_status()
                 data = res.json()
                 judge_reply = data.get("message", {}).get("content", "")
@@ -98,11 +98,11 @@ class LLMJudge:
                     )
         except Exception as err:
             # Fall back cleanly to Heuristic judge if Ollama model/service fails or is offline
-            finding = self.heuristic_judge.evaluate(payload, response_text)
+            finding = await self.heuristic_judge.evaluate(payload, response_text)
             finding.reasoning += f" (LLM judge unavailable: {err})"
             return finding
 
         # Fallback if parsing failed
-        finding = self.heuristic_judge.evaluate(payload, response_text)
+        finding = await self.heuristic_judge.evaluate(payload, response_text)
         finding.reasoning += " (LLM judge output unparseable)"
         return finding

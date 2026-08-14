@@ -8,7 +8,7 @@ from scanner.models import Payload, Finding
 class HeuristicJudge:
     """Evaluates target text responses against heuristic keyword and regex patterns."""
 
-    def evaluate(self, payload: Payload, response_text: str) -> Finding:
+    async def evaluate(self, payload: Payload, response_text: str) -> Finding:
         """Evaluate payload against target response text using heuristics.
 
         Args:

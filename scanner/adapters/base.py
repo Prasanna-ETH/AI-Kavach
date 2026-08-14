@@ -7,8 +7,8 @@ class BaseAdapter(ABC):
     """Abstract adapter defining standard send interface for target endpoints."""
 
     @abstractmethod
-    def send(self, prompt: str) -> str:
-        """Send a prompt to the target LLM endpoint and return response text.
+    async def send(self, prompt: str) -> str:
+        """Send a prompt to the target LLM endpoint asynchronously and return response text.
 
         Args:
             prompt: The payload prompt to send.

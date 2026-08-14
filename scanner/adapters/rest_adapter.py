@@ -106,8 +106,8 @@ class RESTAdapter(BaseAdapter):
             self.parsed_template = body_template
             self.raw_template = None
 
-    def send(self, prompt: str) -> str:
-        """Send prompt to target endpoint using httpx synchronous client.
+    async def send(self, prompt: str) -> str:
+        """Send prompt to target endpoint asynchronously using httpx AsyncClient.
 
         Args:
             prompt: Payload text to send.
@@ -124,8 +124,8 @@ class RESTAdapter(BaseAdapter):
             json_body = None
             content = raw_str
 
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
                 self.url,
                 json=json_body,
                 content=content,
