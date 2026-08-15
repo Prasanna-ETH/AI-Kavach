@@ -32,7 +32,7 @@ def load_payloads(
         selected_packs = {p.strip().lower().replace(".yaml", "") for p in pack_names}
 
     payloads: List[Payload] = []
-    yaml_files = sorted(target_dir.glob("*.yaml"))
+    yaml_files = sorted(target_dir.rglob("*.yaml"))
 
     for filepath in yaml_files:
         stem = filepath.stem.lower()
@@ -92,10 +92,10 @@ def load_multiturn_payloads(
         selected_packs = {p.strip().lower().replace(".yaml", "") for p in pack_names}
 
     payloads: List[MultiTurnPayload] = []
-    yaml_files = sorted(target_dir.glob("multiturn*.yaml"))
+    yaml_files = sorted(target_dir.rglob("multiturn*.yaml"))
 
     if not yaml_files:
-        yaml_files = sorted(target_dir.glob("*.yaml"))
+        yaml_files = sorted(target_dir.rglob("*.yaml"))
 
     for filepath in yaml_files:
         stem = filepath.stem.lower()

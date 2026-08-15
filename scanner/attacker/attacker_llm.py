@@ -4,7 +4,6 @@ import json
 import logging
 import re
 from typing import List, Tuple
-import httpx
 
 from scanner.common.ollama_client import call_local_ollama
 from scanner.models import ConversationTurn

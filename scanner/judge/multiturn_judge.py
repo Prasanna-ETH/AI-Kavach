@@ -4,8 +4,7 @@ import json
 import logging
 import re
 from typing import Optional
-import httpx
-
+from scanner.common.ollama_client import call_local_ollama
 from scanner.models import ConversationTurn, MultiTurnFinding, MultiTurnPayload
 
 logger = logging.getLogger("scanner.judge.multiturn")
@@ -64,45 +63,40 @@ async def judge_conversation(
         transcript_text=transcript_text,
     )
 
-    request_body = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt_text}],
-        "stream": False,
-    }
-
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(ollama_url, json=request_body)
-            res.raise_for_status()
-            data = res.json()
-            reply_text = data.get("message", {}).get("content", "")
+        reply_text = await call_local_ollama(
+            prompt=prompt_text,
+            model=model,
+            ollama_url=ollama_url,
+            timeout=timeout,
+        )
 
-            json_match = re.search(r"\{.*\}", reply_text, re.DOTALL)
-            if json_match:
-                parsed = json.loads(json_match.group(0))
-                vulnerable = bool(parsed.get("vulnerable", False))
-                severity = str(parsed.get("severity", payload.severity)).upper()
-                confidence = float(parsed.get("confidence", 0.9))
-                succeeded_turn = parsed.get("succeeded_at_turn")
-                reasoning = str(parsed.get("reasoning", "Evaluated by Multi-Turn LLM Judge."))
+        json_match = re.search(r"\{.*\}", reply_text, re.DOTALL)
+        if json_match:
+            parsed = json.loads(json_match.group(0))
+            vulnerable = bool(parsed.get("vulnerable", False))
+            severity = str(parsed.get("severity", payload.severity)).upper()
+            confidence = float(parsed.get("confidence", 0.9))
+            succeeded_turn = parsed.get("succeeded_at_turn")
+            reasoning = str(parsed.get("reasoning", "Evaluated by Multi-Turn LLM Judge."))
 
-                if succeeded_turn is not None:
-                    try:
-                        succeeded_turn = int(succeeded_turn)
-                    except (ValueError, TypeError):
-                        succeeded_turn = None
+            if succeeded_turn is not None:
+                try:
+                    succeeded_turn = int(succeeded_turn)
+                except (ValueError, TypeError):
+                    succeeded_turn = None
 
-                return MultiTurnFinding(
-                    payload_id=payload.id,
-                    category=payload.category,
-                    owasp_id=payload.owasp_id,
-                    vulnerable=vulnerable,
-                    severity=severity,
-                    confidence=confidence,
-                    reasoning=reasoning,
-                    full_transcript=transcript,
-                    succeeded_at_turn=succeeded_turn,
-                )
+            return MultiTurnFinding(
+                payload_id=payload.id,
+                category=payload.category,
+                owasp_id=payload.owasp_id,
+                vulnerable=vulnerable,
+                severity=severity,
+                confidence=confidence,
+                reasoning=reasoning,
+                full_transcript=transcript,
+                succeeded_at_turn=succeeded_turn,
+            )
     except Exception as err:
         logger.warning(f"Multi-turn judge LLM error: {err}")
 
