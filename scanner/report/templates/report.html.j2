@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Security Scan Report</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      --critical: #ef4444;
+      --high: #f97316;
+      --medium: #eab308;
+      --low: #3b82f6;
+      --pass: #22c55e;
+      --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      margin: 0;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .header h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 2.25rem;
+      color: #38bdf8;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .card .title {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .card .value {
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-critical { background: var(--critical); color: #fff; }
+    .badge-high { background: var(--high); color: #fff; }
+    .badge-medium { background: var(--medium); color: #000; }
+    .badge-low { background: var(--low); color: #fff; }
+    .badge-pass { background: var(--pass); color: #fff; }
+    .badge-score-0 { background: #15803d; color: #fff; }
+    .badge-score-1 { background: #0284c7; color: #fff; }
+    .badge-score-2 { background: #ca8a04; color: #000; }
+    .badge-score-3 { background: #ea580c; color: #fff; }
+    .badge-score-4 { background: #b91c1c; color: #fff; }
+
+    .grade-badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 1.1rem;
+      margin-left: 0.5rem;
+    }
+    .grade-A { background: #16a34a; color: #fff; }
+    .grade-B { background: #22c55e; color: #000; }
+    .grade-C { background: #eab308; color: #000; }
+    .grade-D { background: #f97316; color: #fff; }
+    .grade-F { background: #dc2626; color: #fff; }
+    
+    .owasp-tag {
+      background: #334155;
+      color: #38bdf8;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      margin-right: 0.5rem;
+    }
+    .judge-tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-family: monospace;
+    }
+    .judge-tag-llm { background: #164e63; color: #22d3ee; }
+    .judge-tag-heuristic { background: #1e3a2f; color: #4ade80; }
+    .judge-tag-fallback { background: #451a03; color: #fb923c; border: 1px solid #f97316; }
+
+    .findings-section {
+      margin-top: 2rem;
+    }
+    .finding-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .finding-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+    .finding-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .prompt-box, .response-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 0.5rem;
+      color: #e2e8f0;
+    }
+    .reasoning {
+      background: rgba(248, 113, 113, 0.1);
+      border-left: 4px solid var(--critical);
+      padding: 0.75rem 1rem;
+      margin-top: 1rem;
+      border-radius: 0 4px 4px 0;
+      color: #fca5a5;
+    }
+    .turn-box {
+      background: #0d1527;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1rem;
+      margin-top: 0.75rem;
+    }
+    .turn-box.succeeded-turn {
+      border: 2px solid var(--critical);
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .turn-role {
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+    .turn-attacker { color: #38bdf8; }
+    .turn-target { color: #f472b6; }
+
+    .converter-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    .converter-table th, .converter-table td {
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+    }
+    .converter-table th {
+      background-color: #1e293b;
+      color: #38bdf8;
+    }
+    .disagreement-row {
+      background-color: rgba(239, 68, 68, 0.15) !important;
+    }
+    .bypass-tag {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-left: 0.5rem;
+      border: 1px solid #ef4444;
+    }
+
+    .btn-details {
+      background: #0284c7;
+      color: #ffffff;
+      border: 1px solid #38bdf8;
+      border-radius: 4px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      white-space: nowrap;
+    }
+    .btn-details:hover {
+      background: #0369a1;
+      border-color: #7dd3fc;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+    }
+    .details-tray {
+      background-color: #070b14 !important;
+    }
+    .tray-content {
+      padding: 1rem 1.25rem;
+      margin: 0.5rem 0;
+      border-radius: 6px;
+      background: #0d1322;
+      border: 1px solid var(--border-color);
+    }
+    .tray-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--text-muted);
+      margin-top: 3rem;
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1.5rem;
+    }
+  </style>
+  <script>
+    function toggleDetails(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'table-row' : 'none';
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🛡️ LLM Security Scan Report</h1>
+      <p style="color: var(--text-muted); margin: 0;">Target: <code>{{ result.target_url if result else target_url }}</code></p>
+    </div>
+
+    {% if result %}
+    {% if result.circuit_broken %}
+    <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--critical); border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 2rem; color: #fca5a5;">
+      <strong>⚠️ Scan Aborted Early (Circuit Breaker Triggered)</strong>: The target endpoint repeatedly refused connections or returned HTTP errors.
+    </div>
+    {% endif %}
+
+    <div class="meta-grid">
+      <div class="card">
+        <div class="title">Security Posture Score</div>
+        <div class="value">
+          {{ result.posture_score | round(1) }} <span class="grade-badge grade-{{ result.grade }}">{{ result.grade }}</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">Total Payloads</div>
+        <div class="value">{{ result.total_payloads }}</div>
+      </div>
+      <div class="card">
+        <div class="title">Vulnerabilities Flagged</div>
+        <div class="value" style="color: {% if result.vulnerable_count > 0 %}var(--critical){% else %}var(--pass){% endif %};">
+          {{ result.vulnerable_count }}
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">Duration</div>
+        <div class="value">{{ result.duration_seconds | round(2) }}s</div>
+      </div>
+    </div>
+
+    {% if result.likert_distribution %}
+    <div class="card" style="margin-bottom: 2rem;">
+      <div class="title">Graduated Likert Severity Distribution (0 to 4 Scale)</div>
+      <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap;">
+        <span class="badge badge-score-0">Score 0 (Safe): {{ result.likert_distribution.get(0, 0) }}</span>
+        <span class="badge badge-score-1">Score 1 (Benign): {{ result.likert_distribution.get(1, 0) }}</span>
+        <span class="badge badge-score-2">Score 2 (Boundary Slip): {{ result.likert_distribution.get(2, 0) }}</span>
+        <span class="badge badge-score-3">Score 3 (Substantial): {{ result.likert_distribution.get(3, 0) }}</span>
+        <span class="badge badge-score-4">Score 4 (Critical): {{ result.likert_distribution.get(4, 0) }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="findings-section">
+      <h2>Single-Turn Findings Details</h2>
+      {% set has_converters = result.findings | selectattr('converter_used') | list | length > 0 %}
+      {% if has_converters %}
+        {% for payload_id, findings_group in result.findings | groupby('payload.id') %}
+        {% set p = findings_group[0].payload %}
+        {% set plain_finding = (findings_group | selectattr('converter_used', 'none') | list | first) %}
+        <div class="finding-item">
+          <div class="finding-header">
+            <div class="finding-title">
+              <span class="owasp-tag">{{ p.owasp_id }}</span>
+              <code>[{{ p.id }}]</code> {{ p.category }}
+            </div>
+          </div>
+          <div style="margin-top: 0.5rem;">
+            <strong>Original Prompt:</strong>
+            <div class="prompt-box">{{ p.prompt }}</div>
+          </div>
+          <h4 style="margin-top: 1rem; color: #38bdf8;">Converter Variants Comparison</h4>
+          <table class="converter-table">
+            <thead>
+              <tr>
+                <th>Variant</th>
+                <th>Result</th>
+                <th>Likert Score</th>
+                <th>Judge Type</th>
+                <th>Confidence</th>
+                <th>Reasoning / Error</th>
+                <th style="text-align: center;">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in findings_group %}
+              {% set is_disagree = plain_finding and (f.vulnerable != plain_finding.vulnerable) %}
+              {% set tray_id = 'tray-' ~ p.id ~ '-' ~ (f.converter_used or 'plain') ~ '-' ~ loop.index %}
+              <tr class="{% if is_disagree %}disagreement-row{% endif %}">
+                <td><code>{{ f.converter_used or 'plain' }}</code></td>
+                <td>
+                  {% if f.error %}
+                    <span class="badge badge-high">ERROR</span>
+                  {% elif f.vulnerable %}
+                    <span class="badge badge-{{ f.severity.lower() }}">{{ f.severity }} VULNERABLE</span>
+                    {% if is_disagree and plain_finding and not plain_finding.vulnerable %}
+                      <span class="bypass-tag">⚡ BYPASS DETECTED</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="badge badge-pass">SAFE</span>
+                  {% endif %}
+                </td>
+                <td><span class="badge badge-score-{{ f.likert_score }}">{{ f.likert_score }}/4</span></td>
+                <td>{{ f.judge_type }}</td>
+                <td>{{ (f.confidence * 100) | round(0) }}%</td>
+                <td>{{ f.error or f.reasoning }}</td>
+                <td style="text-align: center;">
+                  <button type="button" class="btn-details" onclick="toggleDetails('{{ tray_id }}')">
+                    🔍 Details
+                  </button>
+                </td>
+              </tr>
+              <tr id="{{ tray_id }}" class="details-tray" style="display: none;">
+                <td colspan="7">
+                  <div class="tray-content">
+                    <div style="margin-bottom: 0.75rem;">
+                      <div class="tray-title">📤 Sent Prompt to Target LLM ({{ f.converter_used or 'plain' }}):</div>
+                      <div class="prompt-box">{{ f.sent_prompt or f.payload.prompt }}</div>
+                    </div>
+                    <div>
+                      <div class="tray-title">📥 Target LLM Response Message:</div>
+                      <div class="response-box">{{ f.response_text or "(No response / Error)" }}</div>
+                    </div>
+                    {% if f.error %}
+                    <div style="margin-top: 0.75rem;">
+                      <div class="reasoning" style="border-left-color: var(--high); background: rgba(249, 115, 22, 0.1); color: #fdba74;">
+                        <strong>Transmission Error:</strong> {{ f.error }}
+                      </div>
+                    </div>
+                    {% elif f.reasoning %}
+                    <div style="margin-top: 0.75rem;">
+                      <div class="reasoning" style="{% if not f.vulnerable %}border-left-color: #22c55e; background: rgba(34, 197, 94, 0.08); color: #86efac;{% endif %}">
+                        <strong>Judge Reasoning:</strong> {{ f.reasoning }}
+                      </div>
+                    </div>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+      {% else %}
+        {% for finding in result.findings %}
+        <div class="finding-item">
+          <div class="finding-header">
+            <div class="finding-title">
+              <span class="owasp-tag">{{ finding.payload.owasp_id }}</span>
+              <code>[{{ finding.payload.id }}]</code> {{ finding.payload.category }}
+            </div>
+            <div>
+              {% if finding.error %}
+                <span class="badge badge-high">ERROR</span>
+              {% else %}
+                <span class="badge badge-score-{{ finding.likert_score }}">Likert Score {{ finding.likert_score }}/4</span>
+                {% if finding.vulnerable %}
+                  <span class="badge badge-{{ finding.severity.lower() }}">{{ finding.severity }} VULNERABLE</span>
+                {% else %}
+                  <span class="badge badge-pass">PASSED</span>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+
+          <div>
+            <strong>Judge Type:</strong>
+            {% if 'fallback' in finding.judge_type %}
+              <span class="judge-tag judge-tag-fallback">⚠ {{ finding.judge_type }}</span>
+            {% elif finding.judge_type in ('llm', 'llm_likert') %}
+              <span class="judge-tag judge-tag-llm">{{ finding.judge_type }}</span>
+            {% else %}
+              <span class="judge-tag judge-tag-heuristic">{{ finding.judge_type }}</span>
+            {% endif %}
+            |
+            <strong>Confidence:</strong> {{ (finding.confidence * 100) | round(0) }}%
+          </div>
+
+          <div style="margin-top: 1rem;">
+            <strong>Attack Prompt:</strong>
+            <div class="prompt-box">{{ finding.sent_prompt or finding.payload.prompt }}</div>
+          </div>
+
+          <div style="margin-top: 1rem;">
+            <strong>Target Model Response:</strong>
+            <div class="response-box">{{ finding.response_text or "(No response / Error)" }}</div>
+          </div>
+
+          {% if finding.error %}
+          <div class="reasoning" style="border-left-color: var(--high); background: rgba(249, 115, 22, 0.1); color: #fdba74;">
+            <strong>Transmission Error:</strong> {{ finding.error }}
+          </div>
+          {% elif finding.reasoning %}
+          <div class="reasoning" style="{% if not finding.vulnerable %}border-left-color: #22c55e; background: rgba(34, 197, 94, 0.08); color: #86efac;{% endif %}">
+            <strong>Judge Reasoning:</strong> {{ finding.reasoning }}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if multiturn_findings %}
+    <div class="findings-section">
+      <h2>Multi-Turn Adversarial Attack Findings</h2>
+      {% for mt in multiturn_findings %}
+      <div class="finding-item">
+        <div class="finding-header">
+          <div class="finding-title">
+            <span class="owasp-tag">{{ mt.owasp_id }}</span>
+            <code>[{{ mt.payload_id }}]</code> {{ mt.category }}
+          </div>
+          <div>
+            {% if mt.vulnerable %}
+              <span class="badge badge-{{ mt.severity.lower() }}">{{ mt.severity }} VULNERABLE (Turn {{ mt.succeeded_at_turn }})</span>
+            {% else %}
+              <span class="badge badge-pass">PASSED</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div>
+          <strong>Total Turns Executed:</strong> {{ mt.full_transcript | length // 2 }} |
+          <strong>Succeeded at Turn:</strong> {{ mt.succeeded_at_turn or 'None' }}
+        </div>
+
+        {% if mt.reasoning %}
+        <div class="reasoning">
+          <strong>Multi-Turn Judge Evaluation:</strong> {{ mt.reasoning }}
+        </div>
+        {% endif %}
+
+        <details style="margin-top: 1.5rem;" open>
+          <summary style="cursor: pointer; font-weight: 600; color: #38bdf8;">
+            View Full Turn-by-Turn Dialogue Transcript ({{ mt.full_transcript | length }} messages)
+          </summary>
+          <div style="margin-top: 1rem;">
+            {% for turn in mt.full_transcript %}
+            <div class="turn-box {% if mt.succeeded_at_turn and turn.turn_number == mt.succeeded_at_turn and turn.role == 'target' %}succeeded-turn{% endif %}">
+              <div class="turn-role turn-{{ turn.role }}">
+                Turn {{ turn.turn_number }} - {{ turn.role.upper() }}
+                {% if mt.succeeded_at_turn and turn.turn_number == mt.succeeded_at_turn and turn.role == 'target' %}
+                  <span style="color: var(--critical); margin-left: 0.5rem;">⚠️ EARLIEST VULNERABLE RESPONSE</span>
+                {% endif %}
+              </div>
+              <div class="prompt-box" style="margin-top: 0.4rem;">{{ turn.content }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if eval_report_data %}
+    <div class="findings-section">
+      <h2>⚖️ Judge Accuracy Evaluation Report</h2>
+      <div class="meta-grid">
+        <div class="card">
+          <div class="title">Total Evaluated</div>
+          <div class="value">{{ eval_report_data.summary.total_samples }}</div>
+        </div>
+        <div class="card">
+          <div class="title">Accuracy</div>
+          <div class="value" style="color: var(--pass);">{{ (eval_report_data.summary.accuracy * 100) | round(1) }}%</div>
+        </div>
+        <div class="card">
+          <div class="title">Precision / Recall</div>
+          <div class="value" style="font-size: 1.25rem;">P: {{ (eval_report_data.summary.precision * 100) | round(1) }}% | R: {{ (eval_report_data.summary.recall * 100) | round(1) }}%</div>
+        </div>
+        <div class="card">
+          <div class="title">F1 Score</div>
+          <div class="value" style="color: #38bdf8;">{{ eval_report_data.summary.f1_score }}</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1rem;">
+        <div class="title">Confusion Matrix</div>
+        <p style="margin: 0.5rem 0 0 0;">
+          True Positives (TP): <strong>{{ eval_report_data.summary.true_positives }}</strong> |
+          False Positives (FP): <strong style="color: var(--critical);">{{ eval_report_data.summary.false_positives }}</strong> |
+          True Negatives (TN): <strong>{{ eval_report_data.summary.true_negatives }}</strong> |
+          False Negatives (FN): <strong style="color: var(--high);">{{ eval_report_data.summary.false_negatives }}</strong>
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+      Generated by OWASP Top 10 for LLM Applications Security Scanner
+    </div>
+  </div>
+</body>
+</html>
