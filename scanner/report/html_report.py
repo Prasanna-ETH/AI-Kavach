@@ -5,6 +5,7 @@ from typing import List, Optional, Union
 from jinja2 import Environment, FileSystemLoader
 
 from scanner.models import MultiTurnFinding, ScanResult
+from scanner.owasp_mapping import OWASP_LLM_TOP_10, get_owasp_info
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -16,7 +17,7 @@ def generate_html_report(
     target_url: str = "http://localhost:5000/api/chat",
     eval_report_data: Optional[dict] = None,
 ) -> Path:
-    """Render scan results into a HTML report file using Jinja2 template.
+    """Render scan results into an enterprise HTML report file using Jinja2 template.
 
     Args:
         result: Single-turn ScanResult model instance (optional if multi-turn).
@@ -35,12 +36,17 @@ def generate_html_report(
         loader=FileSystemLoader(str(TEMPLATE_DIR)),
         autoescape=True,
     )
+    # Register helper functions
+    env.globals["get_owasp_info"] = get_owasp_info
+    env.globals["OWASP_LLM_TOP_10"] = OWASP_LLM_TOP_10
+
     template = env.get_template("report.html.j2")
     html_content = template.render(
         result=result,
         multiturn_findings=multiturn_findings,
         target_url=target_url if not result else result.target_url,
         eval_report_data=eval_report_data,
+        owasp_taxonomy=OWASP_LLM_TOP_10,
     )
 
     with open(path, "w", encoding="utf-8") as f:

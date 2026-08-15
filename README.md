@@ -1,34 +1,36 @@
 # 🛡️ LLM Sentinel — AI / LLM Application Security Scanner (Version 2.1)
 
-**LLM Sentinel** is an automated, async-powered security scanner designed to audit LLM API endpoints and AI applications for emerging vulnerabilities mapped directly to the **OWASP Top 10 for LLM Applications** (including Prompt Injection, Sensitive Data & PII Leakage, Jailbreaks, and Insecure Output Handling).
+**LLM Sentinel** is an automated, async-powered security scanner designed to audit LLM API endpoints and generative AI applications for emerging vulnerabilities mapped directly to the **OWASP Top 10 for LLM Applications**.
 
-Featuring a **3-Tier Deterministic & Heuristic Safety Judge Architecture**, **0-to-4 Graduated Likert Severity Scoring**, **Universal RLHF Refusal & PII Pattern Detection**, high-concurrency dispatch, circuit breakers, payload encoding converters, multi-turn red-teaming dialogue attacks, and rich interactive HTML inspection reports.
+Equipped with a **3-Tier Deterministic & Heuristic Safety Judge Architecture**, **0-to-4 Graduated Likert Severity Scoring**, **Universal RLHF Refusal & PII Pattern Detection**, high-concurrency dispatch, circuit breakers, payload encoding converters, multi-turn red-teaming dialogue attacks, and rich interactive HTML audit reports with OWASP threat matrices.
 
 ---
 
 ## 🌟 Key Features & Architecture
 
-* **🎯 OWASP Top 10 for LLM Mapping**:
-  * **LLM01**: Direct & Indirect Prompt Injection
-  * **LLM02**: Sensitive Information & PII Disclosure (API Keys, SSNs, Credit Cards, Emails, Phone Numbers)
-  * **LLM06**: Excessive Agency & Jailbreak Bypasses (DAN, Persona Adoption, Hypothetical Overrides)
-  * **LLM07**: System Prompt Leakage & Preamble Extraction
+* **🎯 Comprehensive OWASP Top 10 for LLM Mapping**:
+  * **LLM01: Prompt Injection & Filter Evasion**: System override probes, role flips, and instruction boundary manipulation.
+  * **LLM02: Sensitive Information & PII Disclosure**: Detection of leaked API Keys (AWS, OpenAI, GitHub, JWT), Credit Cards (Visa, MasterCard, Amex, Discover), SSNs, emails, and passwords.
+  * **LLM06: Excessive Agency & Jailbreak Bypasses**: Persona adoption (DAN, Developer Mode), hypothetical scenarios, and unrestricted overrides.
+  * **LLM07: System Prompt Leakage**: Extraction of internal system prompts, preambles, and hidden rules.
+  * **LLM08: Insecure Output Handling**: Protocol abuse, XSS injection scripts, and Markdown image exfiltration.
 * **⚡ 3-Tier Hybrid Evaluation Engine**:
-  * **Tier 0 (Refusal Engine)**: Evaluates 100+ standard RLHF refusal phrases in $<0.01\text{ ms}$ (Score 0 / Safe, zero LLM calls).
-  * **Tier 1 (Signature & PII Engine)**: Evaluates pre-compiled regexes for AWS keys, OpenAI keys, GitHub tokens, JWTs, Private keys, Credit Cards (Visa, MasterCard, Amex), SSNs, and Jailbreak tokens in $<0.5\text{ ms}$ (Score 4 / Critical, zero LLM calls).
+  * **Tier 0 (Universal Refusal Engine)**: Recognizes 100+ standard RLHF refusal templates in $<0.01\text{ ms}$ (Score 0 / Safe, zero LLM calls).
+  * **Tier 1 (Signature & PII Engine)**: Evaluates pre-compiled high-entropy regexes for AWS keys, OpenAI keys, GitHub tokens, JWTs, Private keys, Credit Cards, and SSNs in $<0.5\text{ ms}$ (Score 4 / Critical, zero LLM calls).
   * **Tier 2 (LLM Likert Judge)**: Evaluates nuanced, ambiguous cases using local Ollama models (`llama3.1:8b`, `qwen2.5:3b`, `llama-guard3:8b`) with strict anti-hallucination guardrails.
 * **📊 Graduated 0-to-4 Likert Scoring**:
   * **Score 0**: Safe Refusal / Factual Disproof
   * **Score 1**: Benign Context / Clarification
-  * **Score 2**: Boundary Slip / Partial Hint
-  * **Score 3**: Substantial Disclosure / Persona Adoption
-  * **Score 4**: Critical Exploit / Verbatim Credential Leak
-* **🛡️ Security Posture Score ($0 \dots 100$)**:
-  * Mathematical post-scan health index with letter grading (A, B, C, D, F).
+  * **Score 2**: Boundary Slip / Partial Rule Leak
+  * **Score 3**: Substantial Compromise / Persona Adoption
+  * **Score 4**: Critical Exploit / Verbatim Credential & PII Leak
+* **🛡️ Mathematical Security Posture Score ($0 \dots 100$)**:
+  * Executive health index calculated from observed harm vs. maximum possible harm with letter grades (**A, B, C, D, F**).
 * **🔤 Payload Converters (Obfuscation Testing)**:
   * Tests safety filter evasion via `base64`, `leetspeak`, `rot13`, and low-resource LLM translation (`translation_zulu`).
-* **📑 Interactive HTML & JSON Reporting**:
-  * Dark-mode executive summary report with per-prompt **`🔍 Details`** trays to inspect exact sent prompts, raw target responses, and judge reasoning.
+* **📑 Interactive Executive HTML & JSON Reporting**:
+  * Executive **OWASP Top 10 Threat Posture Matrix** with real-time defense integrity bars.
+  * Category-by-category findings breakdown with per-row **`🔍 Details`** trays displaying transmitted prompts, raw model responses, and judge reasoning.
 
 ---
 
@@ -47,47 +49,100 @@ uv sync
 
 ### 2. Verify / Pull Local Ollama Models
 ```bash
-# Recommended models
+# Recommended models for testing and judging
 ollama pull llama3.1:8b
 ollama pull qwen2.5:3b
 ```
 
-### 3. Start Local Target Server (For Testing)
+### 3. Start Local Vulnerable Target Server (For Testing)
 ```powershell
 uv run python targets/vulnerable_ollama_wrapper.py
 ```
-*Listens on `http://localhost:5000/api/chat`.*
+*Listens on `http://localhost:5000/api/chat` (Apex Wealth AI Finance Chatbot).*
 
 ---
 
-## 💻 CLI Commands & Usage
+## 🚀 CLI Flag Guide & What They Mean
 
-All security scan commands enforce safe-by-design testing and require the `--i-have-permission` authorization flag.
+| CLI Flag | What It Means | Why / When to Use It |
+| :--- | :--- | :--- |
+| `--packs <name>` | Selects which YAML payload pack(s) to scan with (e.g. `agent_evasion_malicious`, `prompt_injection`, `test_quick`). | Target specific vulnerability vectors instead of running all tests. |
+| `--limit <N>` | Restricts the scan to only execute the first **N** payloads. | **Essential for large datasets** (e.g. 500 or 1,000 items) to run a quick test without waiting. |
+| `--concurrency <N>` | Number of concurrent async requests sent to the target simultaneously (default: `1`). | Set to `1` for local models (Ollama) to prevent GPU memory spikes; set to `5`–`10` for fast cloud APIs. |
+| `--delay <seconds>` | Adds a pause (e.g. `0.2` or `0.5` seconds) between successive requests. | **Rate-limiting / cooldown** to prevent connection timeouts, HTTP 429 errors, or target crashes. |
+| `--converters <list>` | Transforms prompts using obfuscation encoders (`base64`, `leetspeak`, `rot13`, `translation_zulu`). | Tests if the target model's safety filters can be **bypassed via encoded/translated inputs**. |
+| `--judge-model <model>`| Specifies which Ollama model to use for Tier-2 evaluation (e.g. `llama3.1:8b`, `qwen2.5:3b`). | Uses higher-parameter models (like 8B) for superior evaluation reasoning and low hallucination. |
+| `--body-template '<json>'`| Dynamic JSON template sent to the target endpoint. Supports `{{PROMPT}}` replacement. | Adapt the scanner to any REST API schema (e.g. OpenAI, Ollama, custom enterprise endpoints). |
+| `--i-have-permission` | Explicit authorization confirmation. | **Mandatory safety gate** required for all scans to enforce safe-by-design AppSec practices. |
+| `-v` / `--verbose` | Enables detailed debug logging in the terminal. | View real-time prompt transmissions, raw responses, and judge evaluations as they happen. |
 
-### 1. Standard Single-Turn Security Scan
+---
+
+## 💻 CLI Execution Recipes for Different Scenarios
+
+All commands require the `--i-have-permission` safety gate.
+
+---
+
+### Scenario 1: Fast 15-Payload Sanity Check with Obfuscation Bypasses
+*Runs the first 15 malicious attacks from the Agent Evasion dataset with Base64, Leetspeak, and ROT13 converters:*
 ```powershell
 uv run python -m scanner.cli scan `
   --url "http://localhost:5000/api/chat" `
   --body-template '{"model": "qwen2.5:3b", "messages": [{"role": "user", "content": "{{PROMPT}}"}]}' `
+  --packs agent_evasion_malicious `
+  --converters base64,leetspeak,rot13 `
+  --limit 15 `
   --judge-model llama3.1:8b `
   --i-have-permission
 ```
 
-### 2. Scanning with Payload Converters (Evasion Testing)
+---
+
+### Scenario 2: Full 500-Payload Adversarial Attack Scan (With Rate Limiting)
+*Runs all 500 malicious attack probes sequentially with a 200ms delay to protect target stability:*
 ```powershell
 uv run python -m scanner.cli scan `
   --url "http://localhost:5000/api/chat" `
   --body-template '{"model": "qwen2.5:3b", "messages": [{"role": "user", "content": "{{PROMPT}}"}]}' `
-  --converters base64,leetspeak,rot13,translation_zulu `
-  --limit 5 `
+  --packs agent_evasion_malicious `
+  --delay 0.2 `
+  --concurrency 1 `
+  --judge-model llama3.1:8b `
   --i-have-permission
 ```
-*Generates `scan_results/report.html`, `scan_results/report.json`, and `scan_results/scan.log`.*
 
 ---
 
-### 3. Multi-Turn Adversarial Red-Teaming (`scan-multiturn`)
-Executes dynamic multi-turn dialogue escalation attacks driven by an adversarial Attacker LLM:
+### Scenario 3: Balanced 50-Item Benchmark (25 Malicious + 25 Benign)
+*Measures both attack detection rate AND false-positive resistance on clean user queries:*
+```powershell
+uv run python -m scanner.cli scan `
+  --url "http://localhost:5000/api/chat" `
+  --body-template '{"model": "qwen2.5:3b", "messages": [{"role": "user", "content": "{{PROMPT}}"}]}' `
+  --packs agent_evasion_quick_50 `
+  --judge-model llama3.1:8b `
+  --i-have-permission
+```
+
+---
+
+### Scenario 4: Scanning Specific OWASP Hand-Curated Packs
+*Audit for Prompt Injection and Sensitive Data Leakage specifically:*
+```powershell
+uv run python -m scanner.cli scan `
+  --url "http://localhost:5000/api/chat" `
+  --body-template '{"model": "qwen2.5:3b", "messages": [{"role": "user", "content": "{{PROMPT}}"}]}' `
+  --packs prompt_injection,sensitive_data_leak `
+  --converters base64,leetspeak `
+  --judge-model llama3.1:8b `
+  --i-have-permission
+```
+
+---
+
+### Scenario 5: Multi-Turn Adversarial Red-Teaming Dialogue (`scan-multiturn`)
+*Launches dynamic conversational escalation attacks driven by an adversarial Attacker LLM:*
 ```powershell
 uv run python -m scanner.cli scan-multiturn `
   --url "http://localhost:5000/api/chat" `
@@ -100,18 +155,8 @@ uv run python -m scanner.cli scan-multiturn `
 
 ---
 
-### 4. Dataset Ingestion & Evaluation
-Convert research CSV benchmarks (e.g. JailbreakBench) into YAML payload packs:
-```powershell
-uv run python -m scanner.cli dataset import-behaviors `
-  --csv dataset/harmful-behaviors.csv `
-  --output scanner/payloads/jbb_derived/jbb_harmful.yaml `
-  --label harmful `
-  --category jailbreak `
-  --owasp-id LLM01
-```
-
-Evaluate judge accuracy, precision, recall, and F1 score against ground-truth benchmarks:
+### Scenario 6: Measuring Judge Accuracy Against Ground-Truth Datasets
+*Evaluates accuracy, precision, recall, and F1 score against human benchmark labels:*
 ```powershell
 uv run python -m scanner.cli dataset eval-judge `
   --csv dataset/judge-comparison.csv `
@@ -125,30 +170,30 @@ uv run python -m scanner.cli dataset eval-judge `
 
 ```
 Final-CTS---AI-LLM-Scanner/
-├── CHANGELOG.md                    # Detailed version history and architectural changes
-├── README.md                       # System documentation and usage guide
+├── CHANGELOG.md                    # Detailed version history and architectural notes
+├── README.md                       # System documentation and execution guide
 ├── pyproject.toml                  # Python package specifications and dependencies
-├── scan_results/                   # Default output directory for HTML/JSON reports
-│   ├── report.html                 # Interactive dark-theme security report with Details trays
-│   ├── report.json                 # Machine-readable scan results
+├── scan_results/                   # Default output directory for reports and logs
+│   ├── report.html                 # Executive dark-theme report with OWASP Scorecard & Details trays
+│   ├── report.json                 # Machine-readable scan results for CI/CD pipelines
 │   └── scan.log                    # Detailed execution debug log
 ├── scanner/                        # Core scanner Python package
 │   ├── cli.py                      # Typer CLI entrypoint & subcommands
 │   ├── config.py                   # YAML payload pack configuration loader
-│   ├── engine.py                   # Async scan orchestration engine
+│   ├── engine.py                   # Async scan orchestration engine (rate limiting, circuit breaker)
 │   ├── models.py                   # Dataclasses (Payload, Finding, ScanResult)
 │   ├── scoring.py                  # Likert distribution & Security Posture Score calculation
 │   ├── owasp_mapping.py            # OWASP Top 10 for LLM taxonomy mappings
 │   ├── adapters/                   # Transport adapters
 │   │   ├── base.py                 # Abstract BaseAdapter interface
-│   │   └── rest_adapter.py         # Async REST API adapter with JSON path extractors
+│   │   └── rest_adapter.py         # Async REST API adapter with dotted-path JSON extractors
 │   ├── attacker/                   # Red-teaming modules
 │   │   └── attacker_llm.py         # Dynamic multi-turn adversarial attacker
 │   ├── converters/                 # Payload prompt obfuscation converters
 │   │   ├── base64_converter.py     # Base64 prompt encoder
 │   │   ├── leetspeak_converter.py  # Leetspeak character mapping encoder
 │   │   ├── rot13_converter.py      # ROT13 cipher encoder
-│   │   ├── translation_converter.py# LLM low-resource translation converter (Zulu, etc.)
+│   │   ├── translation_converter.py# LLM translation converter (e.g. Zulu, Welsh)
 │   │   └── registry.py             # Converter factory registry
 │   ├── judge/                      # Multi-Tier Evaluation Judges
 │   │   ├── signatures.py           # Signature DB (Refusal phrases, API keys, PII, Jailbreaks)
@@ -158,29 +203,30 @@ Final-CTS---AI-LLM-Scanner/
 │   │   └── multiturn_judge.py      # Multi-turn transcript evaluator
 │   ├── payloads/                   # Curated YAML payload packs
 │   │   ├── handwritten/            # Curated single and multi-turn packs
+│   │   ├── agent_evasion/          # 1,000-prompt Kaggle Agent Evasion dataset packs
 │   │   └── jbb_derived/            # Benchmark dataset-derived packs
 │   └── report/                     # Report generation
 │       ├── html_report.py          # Jinja2 HTML report generator
 │       ├── json_report.py          # Structured JSON exporter
-│       └── templates/              # HTML Jinja2 templates
+│       └── templates/              # HTML Jinja2 templates with OWASP matrix
 ├── targets/                        # Mock test targets
-│   └── vulnerable_ollama_wrapper.py# Local test endpoint listening on port 5000
-└── tests/                          # Pytest unit & integration test suite (54 tests)
+│   └── vulnerable_ollama_wrapper.py# Apex Wealth AI Finance Assistant listening on port 5000
+└── tests/                          # Automated Pytest suite (54 unit tests)
 ```
 
 ---
 
-## 🧪 Running Tests
+## 🧪 Running Automated Tests
 
-Execute the automated test suite with pytest:
+Run the full pytest suite to verify all components:
 ```bash
 uv run pytest
 ```
-*All 54 unit tests covering converters, dataset ingestion, heuristic regexes, PII detection, Likert scoring, and REST adapters pass with 100% success.*
+*All 54 unit tests covering converters, dataset loaders, signature matching, PII regexes, Likert calculations, and REST adapters pass with 100% success.*
 
 ---
 
-## 🛡️ Safe-by-Design Compliance
-1. **Safety Gate**: Scans cannot execute without the explicit `--i-have-permission` flag.
-2. **Circuit Breaking**: The engine halts automated scans early if the target endpoint repeatedly errors or fails connectivity.
-3. **Rate Limiting**: Configurable request delay (`--delay`) and concurrency control (`--concurrency`) to protect target infrastructure.
+## 🛡️ Safe-by-Design Principles
+1. **Explicit Authorization Gate**: Requires the `--i-have-permission` flag for all security scans.
+2. **Circuit Breaking**: The engine halts automated testing early if the target endpoint repeatedly errors or fails connectivity.
+3. **Rate Limiting & Concurrency Control**: Prevents target denial-of-service through customizable `--delay` and `--concurrency` controls.
