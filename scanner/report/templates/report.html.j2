@@ -158,6 +158,35 @@
     .turn-attacker { color: #38bdf8; }
     .turn-target { color: #f472b6; }
 
+    .converter-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    .converter-table th, .converter-table td {
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+    }
+    .converter-table th {
+      background-color: #1e293b;
+      color: #38bdf8;
+    }
+    .disagreement-row {
+      background-color: rgba(239, 68, 68, 0.15) !important;
+    }
+    .bypass-tag {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-left: 0.5rem;
+      border: 1px solid #ef4444;
+    }
+
     .footer {
       text-align: center;
       color: var(--text-muted);
@@ -205,52 +234,105 @@
 
     <div class="findings-section">
       <h2>Single-Turn Findings Details</h2>
-      {% for finding in result.findings %}
-      <div class="finding-item">
-        <div class="finding-header">
-          <div class="finding-title">
-            <span class="owasp-tag">{{ finding.payload.owasp_id }}</span>
-            <code>[{{ finding.payload.id }}]</code> {{ finding.payload.category }}
+      {% set has_converters = result.findings | selectattr('converter_used') | list | length > 0 %}
+      {% if has_converters %}
+        {% for payload_id, findings_group in result.findings | groupby('payload.id') %}
+        {% set p = findings_group[0].payload %}
+        {% set plain_finding = (findings_group | selectattr('converter_used', 'none') | list | first) %}
+        <div class="finding-item">
+          <div class="finding-header">
+            <div class="finding-title">
+              <span class="owasp-tag">{{ p.owasp_id }}</span>
+              <code>[{{ p.id }}]</code> {{ p.category }}
+            </div>
           </div>
+          <div style="margin-top: 0.5rem;">
+            <strong>Original Prompt:</strong>
+            <div class="prompt-box">{{ p.prompt }}</div>
+          </div>
+          <h4 style="margin-top: 1rem; color: #38bdf8;">Converter Variants Comparison</h4>
+          <table class="converter-table">
+            <thead>
+              <tr>
+                <th>Variant</th>
+                <th>Result</th>
+                <th>Judge Type</th>
+                <th>Confidence</th>
+                <th>Reasoning</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in findings_group %}
+              {% set is_disagree = plain_finding and (f.vulnerable != plain_finding.vulnerable) %}
+              <tr class="{% if is_disagree %}disagreement-row{% endif %}">
+                <td><code>{{ f.converter_used or 'plain' }}</code></td>
+                <td>
+                  {% if f.vulnerable %}
+                    <span class="badge badge-{{ f.severity.lower() }}">{{ f.severity }} VULNERABLE</span>
+                    {% if is_disagree and plain_finding and not plain_finding.vulnerable %}
+                      <span class="bypass-tag">⚡ BYPASS DETECTED</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="badge badge-pass">SAFE</span>
+                  {% endif %}
+                </td>
+                <td>{{ f.judge_type }}</td>
+                <td>{{ (f.confidence * 100) | round(0) }}%</td>
+                <td>{{ f.reasoning }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+      {% else %}
+        {% for finding in result.findings %}
+        <div class="finding-item">
+          <div class="finding-header">
+            <div class="finding-title">
+              <span class="owasp-tag">{{ finding.payload.owasp_id }}</span>
+              <code>[{{ finding.payload.id }}]</code> {{ finding.payload.category }}
+            </div>
+            <div>
+              {% if finding.vulnerable %}
+                <span class="badge badge-{{ finding.severity.lower() }}">{{ finding.severity }} VULNERABLE</span>
+              {% else %}
+                <span class="badge badge-pass">PASSED</span>
+              {% endif %}
+            </div>
+          </div>
+
           <div>
-            {% if finding.vulnerable %}
-              <span class="badge badge-{{ finding.severity.lower() }}">{{ finding.severity }} VULNERABLE</span>
+            <strong>Judge Type:</strong>
+            {% if 'fallback' in finding.judge_type %}
+              <span class="judge-tag judge-tag-fallback">⚠ {{ finding.judge_type }}</span>
+            {% elif finding.judge_type == 'llm' %}
+              <span class="judge-tag judge-tag-llm">{{ finding.judge_type }}</span>
             {% else %}
-              <span class="badge badge-pass">PASSED</span>
+              <span class="judge-tag judge-tag-heuristic">{{ finding.judge_type }}</span>
             {% endif %}
+            |
+            <strong>Confidence:</strong> {{ (finding.confidence * 100) | round(0) }}%
           </div>
-        </div>
 
-        <div>
-          <strong>Judge Type:</strong>
-          {% if 'fallback' in finding.judge_type %}
-            <span class="judge-tag judge-tag-fallback">⚠ {{ finding.judge_type }}</span>
-          {% elif finding.judge_type == 'llm' %}
-            <span class="judge-tag judge-tag-llm">{{ finding.judge_type }}</span>
-          {% else %}
-            <span class="judge-tag judge-tag-heuristic">{{ finding.judge_type }}</span>
+          <div style="margin-top: 1rem;">
+            <strong>Attack Prompt:</strong>
+            <div class="prompt-box">{{ finding.payload.prompt }}</div>
+          </div>
+
+          <div style="margin-top: 1rem;">
+            <strong>Target Model Response:</strong>
+            <div class="response-box">{{ finding.response_text or "(No response / Error)" }}</div>
+          </div>
+
+          {% if finding.reasoning %}
+          <div class="reasoning">
+            <strong>Judge Reasoning:</strong> {{ finding.reasoning }}
+          </div>
           {% endif %}
-          |
-          <strong>Confidence:</strong> {{ (finding.confidence * 100) | round(0) }}%
         </div>
-
-        <div style="margin-top: 1rem;">
-          <strong>Attack Prompt:</strong>
-          <div class="prompt-box">{{ finding.payload.prompt }}</div>
-        </div>
-
-        <div style="margin-top: 1rem;">
-          <strong>Target Model Response:</strong>
-          <div class="response-box">{{ finding.response_text or "(No response / Error)" }}</div>
-        </div>
-
-        {% if finding.reasoning %}
-        <div class="reasoning">
-          <strong>Judge Reasoning:</strong> {{ finding.reasoning }}
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
+        {% endfor %}
+      {% endif %}
     </div>
     {% endif %}
 

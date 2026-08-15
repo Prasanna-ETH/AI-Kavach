@@ -6,6 +6,7 @@ import re
 from typing import List, Tuple
 import httpx
 
+from scanner.common.ollama_client import call_local_ollama
 from scanner.models import ConversationTurn
 
 logger = logging.getLogger("scanner.attacker")
@@ -84,28 +85,22 @@ class AttackerLLM:
             transcript_text=transcript_text,
         )
 
-        request_body = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": formatted_prompt}],
-            "stream": False,
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                res = await client.post(self.ollama_url, json=request_body)
-                res.raise_for_status()
-                data = res.json()
-                reply_text = data.get("message", {}).get("content", "")
+            reply_text = await call_local_ollama(
+                prompt=formatted_prompt,
+                model=self.model,
+                ollama_url=self.ollama_url,
+                timeout=self.timeout,
+            )
+            json_match = re.search(r"\{.*\}", reply_text, re.DOTALL)
+            if json_match:
+                parsed = json.loads(json_match.group(0))
+                next_msg = str(parsed.get("next_message", "")).strip()
+                reasoning = str(parsed.get("reasoning", "")).strip()
+                stop_early = bool(parsed.get("stop_early", False))
 
-                json_match = re.search(r"\{.*\}", reply_text, re.DOTALL)
-                if json_match:
-                    parsed = json.loads(json_match.group(0))
-                    next_msg = str(parsed.get("next_message", "")).strip()
-                    reasoning = str(parsed.get("reasoning", "")).strip()
-                    stop_early = bool(parsed.get("stop_early", False))
-
-                    logger.debug(f"Attacker LLM Decision (stop_early={stop_early}): {reasoning}")
-                    return next_msg, stop_early, reasoning
+                logger.debug(f"Attacker LLM Decision (stop_early={stop_early}): {reasoning}")
+                return next_msg, stop_early, reasoning
         except Exception as err:
             logger.debug(f"Attacker LLM call failed or offline: {err}")
 

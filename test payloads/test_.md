@@ -1,6 +1,10 @@
 uv run scanner scan-multiturn --url "http://localhost:5000/api/chat" --body-template '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"{{PROMPT}}"}]}' --response-field "message.content" --attacker-model qwen2.5:0.5b --max-turns 4 --i-have-permission
 uv run scanner scan --url "http://localhost:5000/api/chat" --body-template '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"{{PROMPT}}"}]}' --response-field "message.content" --i-have-permission
 
+scanner dataset scan-behaviors --url http://localhost:5000/api/chat --response-field message.content --pack jbb_harmful.yaml --i-have-permission
+
+
+py -m scanner.cli dataset eval-judge --csv dataset/judge-comparison.csv --sample-size 5 
 # Scanner CLI Capabilities Overview
 
 The scanner CLI provides two primary scanning modes:
@@ -168,3 +172,94 @@ Detailed execution log containing:
 * Circuit breaker events
 * LLM judge evaluations
 * Scan execution details
+
+
+
+1. scan — Single-Turn Security Scan
+Executes single-turn security payload tests against a target **LLM** endpoint.
+
+powershell
+.venv\Scripts\python -m scanner.cli scan --url *[http://localhost:**5000**/api/chat*](http://localhost:**5000**/api/chat*) --body-template '{*prompt*:*{{**PROMPT**}}"}' --i-have-permission
+Flags & Options:
+Flag / Option	Short	Type	Default	Description
+--url	-u	String	Required	Target **API** endpoint **URL**.
+--body-template	-b	String	Required	**JSON** request body template containing {{**PROMPT**}} placeholder.
+--i-have-permission		Flag	False	Required safety gate. Must be passed to authorize scanning.
+--converters		String	None	Comma-separated converters to apply (e.g. base64,leetspeak,rot13,translation_zulu).
+--use-llm-judge		Flag	False	Enforce local Ollama **LLM** judge for all evaluations.
+--packs	-p	String	All	Comma-separated payload packs to run (e.g. prompt_injection,jailbreak).
+--concurrency	-c	Int	5	Maximum simultaneous async **HTTP** requests.
+--delay	-d	Float	0.0	Delay in seconds between requests per worker.
+--response-field	-r	String	message.content	Dotted **JSON** path key to extract model response text.
+--auth-header	-a	List	None	Custom headers (e.g. -a *Authorization: Bearer <key>*).
+--output-dir	-o	Path	scan_results	Directory to save report.html, report.json, and scan.log.
+Example with Converters & **LLM** Judge:
+powershell
+.venv\Scripts\python -m scanner.cli scan `
+    --url *[http://localhost:**5000**/api/chat*](http://localhost:**5000**/api/chat*) `
+    --body-template '{*prompt*:*{{**PROMPT**}}"}' `
+    --converters base64,leetspeak,rot13,translation_zulu `
+    --use-llm-judge `
+    --i-have-permission
+2. scan-multiturn — Multi-Turn Adversarial Scan
+Executes multi-turn conversation attacks driven by an adversarial Attacker **LLM**.
+
+powershell
+.venv\Scripts\python -m scanner.cli scan-multiturn --url *[http://localhost:**5000**/api/chat*](http://localhost:**5000**/api/chat*) --body-template '{*prompt*:*{{**PROMPT**}}"}' --i-have-permission
+Flags & Options:
+Flag / Option	Short	Type	Default	Description
+--url	-u	String	Required	Target **API** endpoint **URL**.
+--body-template	-b	String	Required	**JSON** request body template with {{**PROMPT**}}.
+--i-have-permission		Flag	False	Required safety gate.
+--attacker-model		String	qwen2.5:0.5b	Local Ollama model driving red-team conversation turns.
+--judge-model		String	qwen2.5:0.5b	Local Ollama model evaluating full transcript.
+--max-turns	-m	Int	4	Maximum conversation turns per scenario (capped at 8).
+--packs	-p	String	All	Comma-separated multi-turn payload scenario packs.
+--delay	-d	Float	0.5	Delay in seconds between request turns.
+--response-field	-r	String	message.content	Key path for target response.
+--auth-header	-a	List	None	Custom **HTTP** headers.
+--output-dir	-o	Path	scan_results	Directory to save multi-turn reports.
+3. dataset import-behaviors — Import Dataset **CSV**
+Converts harmful or benign behavior datasets (e.g. JailbreakBench) into **YAML** payload packs.
+
+powershell
+.venv\Scripts\python -m scanner.cli dataset import-behaviors --csv *dataset/harmful.csv* --output *scanner/payloads/jbb_harmful.yaml* --label harmful
+Flags & Options:
+Flag / Option	Type	Default	Description
+--csv	Path	Required	Input **CSV** filepath containing behavior prompts.
+--output	Path	Required	Destination **YAML** payload pack filepath.
+--label	String	Required	Behavior label: harmful or benign.
+--category	String	jailbreak	Category identifier assigned to imported payloads.
+--owasp-id	String	**LLM01**	Mapped **OWASP** Top 10 category code.
+4. dataset scan-behaviors — Scan Imported Dataset Pack
+Runs security scan using imported dataset **YAML** packs and outputs success/false-positive metrics.
+
+powershell
+.venv\Scripts\python -m scanner.cli dataset scan-behaviors --url *[http://localhost:**5000**/api/chat*](http://localhost:**5000**/api/chat") --pack jbb_harmful.yaml --i-have-permission
+Flags & Options:
+Flag / Option	Short	Type	Default	Description
+--url	-u	String	Required	Target **API** endpoint **URL**.
+--pack	-p	String	Required	Payload pack filename or path (e.g., jbb_harmful.yaml).
+--i-have-permission		Flag	False	Required safety gate.
+--body-template	-b	String	{*prompt*: *{{**PROMPT**}}*}	**JSON** body template.
+--use-llm-judge		Flag	False	Enforce **LLM** Judge evaluation.
+--concurrency	-c	Int	5	Simultaneous requests limit.
+--delay	-d	Float	0.0	Request delay.
+--output-dir	-o	Path	scan_results	Output directory.
+5. dataset eval-judge — Judge Accuracy Evaluation
+Offline evaluation measuring heuristic and **LLM** judge accuracy/precision/recall against ground-truth human datasets.
+
+powershell
+.venv\Scripts\python -m scanner.cli dataset eval-judge --csv *dataset/judge-comparison.csv*
+Flags & Options:
+Flag / Option	Short	Type	Default	Description
+--csv		Path	Required	Path to judge-comparison.csv ground truth dataset.
+--sample-size	-s	Int	All	Optional random subset size for fast evaluation runs.
+--judge-model		String	qwen2.5:0.5b	Ollama model name used for judging.
+--ollama-url		String	[http://localhost:**11434**/api/chat](http://localhost:**11434**/api/chat)	Ollama **API** endpoint **URL**.
+--timeout		Float	30.0	Timeout per **LLM** judge call in seconds.
+--output-dir	-o	Path	scan_results	Directory to save judge_eval_report.json & **HTML** report.
+💡 Converter Names Reference (--converters)
+When using --converters with the scan command, you can combine any of the following:
+
+base64 — Standard Base64 prompt encoding leetspeak — Character mapping (a->4, e->3, i->1, o->0, s->5, t->7) rot13 — **ROT13** cipher transformation translation_zulu — Translation to Zulu via local **LLM** translation_<lang> — Translation to any target language (e.g., translation_welsh, translation_yoruba)

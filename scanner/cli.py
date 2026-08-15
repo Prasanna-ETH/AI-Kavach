@@ -10,15 +10,19 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from datetime import datetime, timezone
+import time
+
 from scanner.adapters.rest_adapter import RESTAdapter
 from scanner.attacker.attacker_llm import AttackerLLM
 from scanner.config import load_multiturn_payloads, load_payloads
+from scanner.converters.registry import get_converter
 from scanner.datasets.csv_loader import load_behaviors_csv, load_judge_comparison_csv
 from scanner.datasets.csv_to_yaml import convert_behaviors_to_payloads, save_payloads_to_yaml
-from scanner.engine import ScanEngine
+from scanner.engine import ScanEngine, run_scan_with_converters
 from scanner.judge.heuristics import HeuristicJudge
 from scanner.judge.llm_judge import LLMJudge, check_ollama_available, FALLBACK_JUDGE_TYPE
-from scanner.models import Finding, MultiTurnFinding, MultiTurnPayload, Payload
+from scanner.models import Finding, MultiTurnFinding, MultiTurnPayload, Payload, ScanResult
 from scanner.report.eval_report import compute_eval_metrics, generate_eval_report
 from scanner.report.html_report import generate_html_report
 from scanner.report.json_report import generate_json_report, generate_multiturn_json_report
@@ -126,6 +130,17 @@ def scan(
         "--use-llm-judge",
         help="Enforce local LLM Judge for all payload evaluations",
     ),
+    converters: Optional[str] = typer.Option(
+        None,
+        "--converters",
+        help="Comma-separated payload converters to apply (e.g. 'base64,leetspeak,rot13,translation_zulu')",
+    ),
+    limit: Optional[int] = typer.Option(
+        None,
+        "--limit",
+        "-l",
+        help="Limit execution to the first N payloads (e.g. --limit 5)",
+    ),
     output_dir: Path = typer.Option(
         Path("scan_results"),
         "--output-dir",
@@ -133,7 +148,6 @@ def scan(
         help="Directory to save report.html, report.json, and scan.log",
     ),
 ) -> None:
-    """Execute single-turn security scan asynchronously against target LLM API endpoint."""
     if not i_have_permission:
         console.print(
             Panel(
@@ -150,7 +164,7 @@ def scan(
     logger = setup_logging(log_file)
 
     logger.info(f"LLM Security Scanner initialized against target: {url}")
-    logger.info(f"Configuration: concurrency={concurrency}, delay={delay}s, use_llm_judge={use_llm_judge}")
+    logger.info(f"Configuration: concurrency={concurrency}, delay={delay}s, use_llm_judge={use_llm_judge}, converters={converters}, limit={limit}")
 
     console.print(
         Panel(
@@ -160,10 +174,23 @@ def scan(
         )
     )
 
+    converter_instances = []
+    if converters:
+        raw_names = [c.strip() for c in converters.split(",") if c.strip()]
+        for cname in raw_names:
+            try:
+                converter_instances.append(get_converter(cname))
+            except ValueError as err:
+                logger.error(f"Invalid converter specified: {err}")
+                console.print(f"[bold red]Converter Error:[/bold red] {err}")
+                raise typer.Exit(code=1)
+
     pack_list = [p.strip() for p in packs.split(",")] if packs else None
 
     try:
         payloads = load_payloads(pack_names=pack_list)
+        if limit and limit > 0:
+            payloads = payloads[:limit]
     except Exception as err:
         logger.error(f"Failed to load payload packs: {err}")
         console.print(f"[bold red]Failed to load payload packs:[/bold red] {err}")
@@ -196,30 +223,81 @@ def scan(
             raise typer.Exit(code=1)
         console.print(f"[bold green]✓[/bold green] {msg}")
 
-    console.print(f"Loaded [bold green]{len(payloads)}[/bold green] attack payloads. Starting async scan...\n")
+    console.print(f"Loaded [bold green]{len(payloads)}[/bold green] attack payloads. Starting scan...\n")
 
-    def progress_callback(index: int, total: int, payload: Payload, finding: Optional[Finding]) -> None:
-        if finding is None:
-            return
+    if converter_instances:
+        plain_vulnerable_map: dict[str, bool] = {}
 
-        if finding.error:
-            status_str = "[bold yellow]ERROR[/bold yellow]"
-        elif finding.vulnerable:
-            sev_color = {
-                "CRITICAL": "bold red",
-                "HIGH": "red",
-                "MEDIUM": "yellow",
-                "LOW": "blue",
-            }.get(finding.severity.upper(), "bold red")
-            status_str = f"[{sev_color}]VULNERABLE ({finding.severity})[/{sev_color}]"
-        else:
-            status_str = "[bold green]PASSED[/bold green]"
+        def conv_progress_callback(
+            idx: int,
+            total: int,
+            payload: Payload,
+            variant_name: Optional[str],
+            finding: Finding,
+        ) -> None:
+            v_name = variant_name if variant_name else "plain"
+            if variant_name is None:
+                plain_vulnerable_map[payload.id] = finding.vulnerable
+                res_str = "[bold red]VULNERABLE[/bold red]" if finding.vulnerable else "[bold green]SAFE[/bold green]"
+                console.print(f"[{payload.id}] {v_name}: {res_str}")
+            else:
+                plain_vuln = plain_vulnerable_map.get(payload.id, False)
+                if finding.vulnerable != plain_vuln:
+                    if finding.vulnerable:
+                        res_str = "[bold red blink]VULNERABLE  <-- bypass detected![/bold red blink]"
+                    else:
+                        res_str = "[bold yellow]SAFE  (plain was vulnerable)[/bold yellow]"
+                else:
+                    res_str = "[bold red]VULNERABLE[/bold red]" if finding.vulnerable else "[bold green]SAFE[/bold green]"
+                console.print(f"[{payload.id}] {v_name}: {res_str}")
 
-        console.print(
-            f"[{index}/{total}] [{payload.owasp_id}] [bold]{payload.id}[/bold] ({payload.category}) -> {status_str}"
+        start_t = time.time()
+        start_iso = datetime.now(timezone.utc).isoformat()
+        findings = asyncio.run(
+            run_scan_with_converters(
+                adapter=adapter,
+                payloads=payloads,
+                converters=converter_instances,
+                delay=delay,
+                use_llm_judge=use_llm_judge,
+                progress_callback=conv_progress_callback,
+            )
         )
+        end_t = time.time()
+        end_iso = datetime.now(timezone.utc).isoformat()
 
-    result = asyncio.run(engine.run(payloads, progress_callback=progress_callback))
+        result = ScanResult(
+            target_url=url,
+            start_time=start_iso,
+            end_time=end_iso,
+            total_payloads=len(findings),
+            findings=findings,
+            circuit_broken=False,
+            duration_seconds=end_t - start_t,
+        )
+    else:
+        def progress_callback(index: int, total: int, payload: Payload, finding: Optional[Finding]) -> None:
+            if finding is None:
+                return
+
+            if finding.error:
+                status_str = "[bold yellow]ERROR[/bold yellow]"
+            elif finding.vulnerable:
+                sev_color = {
+                    "CRITICAL": "bold red",
+                    "HIGH": "red",
+                    "MEDIUM": "yellow",
+                    "LOW": "blue",
+                }.get(finding.severity.upper(), "bold red")
+                status_str = f"[{sev_color}]VULNERABLE ({finding.severity})[/{sev_color}]"
+            else:
+                status_str = "[bold green]PASSED[/bold green]"
+
+            console.print(
+                f"[{index}/{total}] [{payload.owasp_id}] [bold]{payload.id}[/bold] ({payload.category}) -> {status_str}"
+            )
+
+        result = asyncio.run(engine.run(payloads, progress_callback=progress_callback))
 
     # Save reports
     json_path = generate_json_report(result, output_dir / "report.json")
@@ -520,6 +598,12 @@ def scan_behaviors(
         "--use-llm-judge",
         help="Enforce local LLM Judge for all payload evaluations",
     ),
+    limit: Optional[int] = typer.Option(
+        None,
+        "--limit",
+        "-l",
+        help="Limit execution to the first N payloads (e.g. --limit 5)",
+    ),
     output_dir: Path = typer.Option(
         Path("scan_results"),
         "--output-dir",
@@ -548,6 +632,9 @@ def scan_behaviors(
         payloads = load_payloads(pack_names=[pack_path.stem], custom_dir=pack_path.parent)
     else:
         payloads = load_payloads(pack_names=[pack])
+
+    if limit and limit > 0:
+        payloads = payloads[:limit]
 
     if not payloads:
         console.print(f"[yellow]No payloads loaded from pack: {pack}[/yellow]")

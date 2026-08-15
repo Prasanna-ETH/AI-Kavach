@@ -10,6 +10,7 @@ import httpx
 
 from scanner.adapters.base import BaseAdapter
 from scanner.attacker.attacker_llm import AttackerLLM
+from scanner.converters.base import Converter
 from scanner.judge.heuristics import HeuristicJudge
 from scanner.judge.llm_judge import LLMJudge
 from scanner.judge.multiturn_judge import judge_conversation
@@ -91,6 +92,65 @@ class ScanEngine:
                 logger.error(f"Payload {payload_id} failed with {error_msg}")
                 return "", error_msg
 
+    async def _send_and_judge(
+        self,
+        payload: Payload,
+        prompt_to_send: str,
+        converter_name: Optional[str] = None,
+    ) -> Finding:
+        """Send prompt to target and evaluate with heuristic/LLM judge.
+
+        Args:
+            payload: Payload definition object.
+            prompt_to_send: Actual text sent to target (could be converted or plain).
+            converter_name: Name of converter used, or None if plain text baseline.
+
+        Returns:
+            Finding object with evaluation result.
+        """
+        response_text, error = await self._execute_with_backoff(prompt_to_send, payload.id)
+
+        if error:
+            finding = Finding(
+                payload=payload,
+                response_text="",
+                vulnerable=False,
+                severity=payload.severity,
+                confidence=0.0,
+                judge_type="none",
+                reasoning=f"Transmission failed: {error}",
+                error=error,
+                converter_used=converter_name,
+                original_prompt=payload.prompt if converter_name else None,
+            )
+        else:
+            temp_payload = Payload(
+                id=payload.id,
+                category=payload.category,
+                owasp_id=payload.owasp_id,
+                prompt=prompt_to_send,
+                severity=payload.severity,
+                heuristic_keywords=payload.heuristic_keywords,
+                requires_llm_judge=payload.requires_llm_judge,
+                expected_vulnerable=payload.expected_vulnerable,
+                source=payload.source,
+            )
+
+            if payload.requires_llm_judge or self.use_llm_judge:
+                finding = await self.llm_judge.evaluate(temp_payload, response_text)
+            else:
+                finding = await self.heuristic_judge.evaluate(temp_payload, response_text)
+
+            finding.payload = payload
+            finding.converter_used = converter_name
+            finding.original_prompt = payload.prompt if converter_name else None
+
+        variant_label = converter_name if converter_name else "plain"
+        logger.info(
+            f"Variant [{variant_label}] sent for payload {payload.id} ({payload.category}) -> vulnerable={finding.vulnerable}"
+        )
+        return finding
+
     async def run(
         self,
         payloads: List[Payload],
@@ -130,46 +190,21 @@ class ScanEngine:
                 if progress_callback:
                     progress_callback(index, total, payload, None)
 
-                response_text, error = await self._execute_with_backoff(payload.prompt, payload.id)
+                finding = await self._send_and_judge(payload, payload.prompt, converter_name=None)
 
-                if error:
-                    async with state_lock:
+                async with state_lock:
+                    if finding.error:
                         consecutive_failures += 1
                         if consecutive_failures >= self.circuit_breaker_threshold:
                             circuit_broken = True
                             logger.error(f"Circuit breaker triggered after {consecutive_failures} consecutive failures!")
-
-                    finding = Finding(
-                        payload=payload,
-                        response_text="",
-                        vulnerable=False,
-                        severity=payload.severity,
-                        confidence=0.0,
-                        judge_type="none",
-                        reasoning=f"Transmission failed: {error}",
-                        error=error,
-                    )
-                else:
-                    async with state_lock:
+                    else:
                         consecutive_failures = 0
 
-                    if payload.requires_llm_judge or self.use_llm_judge:
-                        finding = await self.llm_judge.evaluate(payload, response_text)
-                    else:
-                        finding = await self.heuristic_judge.evaluate(payload, response_text)
-
-                async with state_lock:
                     findings.append(finding)
 
                 if progress_callback:
                     progress_callback(index, total, payload, finding)
-
-                if finding.vulnerable:
-                    logger.warning(
-                        f"VULNERABILITY DETECTED [{finding.severity}] {payload.id} ({payload.category}): {finding.reasoning}"
-                    )
-                else:
-                    logger.info(f"Payload passed [{payload.id}] ({payload.category})")
 
                 if self.delay > 0:
                     await asyncio.sleep(self.delay)
@@ -365,3 +400,68 @@ class ScanEngine:
                 )
 
         return results
+
+
+async def run_scan_with_converters(
+    adapter: BaseAdapter,
+    payloads: List[Payload],
+    converters: List[Converter],
+    delay: float = 1.0,
+    use_llm_judge: bool = False,
+    ollama_url: str = "http://localhost:11434/api/chat",
+    progress_callback: Optional[Callable[[int, int, Payload, Optional[str], Finding], None]] = None,
+) -> List[Finding]:
+    """Run security scan sending both plain-text baseline and converted variants for each payload.
+
+    Args:
+        adapter: BaseAdapter target endpoint adapter.
+        payloads: List of Payload items to scan.
+        converters: List of Converter instances to apply.
+        delay: Delay in seconds between requests.
+        use_llm_judge: Whether to enforce LLM judge.
+        ollama_url: Ollama API URL endpoint.
+        progress_callback: Optional callback receiving (payload_index, total_payloads, payload, variant_name, finding).
+
+    Returns:
+        List of Finding objects (plain text baseline findings and converter variant findings).
+    """
+    engine = ScanEngine(
+        adapter=adapter,
+        delay=delay,
+        concurrency=1,
+        use_llm_judge=use_llm_judge,
+        ollama_url=ollama_url,
+    )
+
+    all_findings: List[Finding] = []
+    total_payloads = len(payloads)
+
+    for idx, payload in enumerate(payloads, start=1):
+        # a. ALWAYS send and judge plain-text prompt first
+        plain_finding = await engine._send_and_judge(payload, payload.prompt, converter_name=None)
+        all_findings.append(plain_finding)
+
+        if progress_callback:
+            progress_callback(idx, total_payloads, payload, None, plain_finding)
+
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+        # b. For each converter in converters list: transform, send, judge, record
+        for converter in converters:
+            try:
+                transformed_prompt = await converter.transform(payload.prompt)
+            except Exception as err:
+                logger.error(f"Converter '{converter.name}' transform failed on payload {payload.id}: {err}")
+                transformed_prompt = payload.prompt
+
+            conv_finding = await engine._send_and_judge(payload, transformed_prompt, converter_name=converter.name)
+            all_findings.append(conv_finding)
+
+            if progress_callback:
+                progress_callback(idx, total_payloads, payload, converter.name, conv_finding)
+
+            if delay > 0:
+                await asyncio.sleep(delay)
+
+    return all_findings

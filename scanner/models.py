@@ -59,6 +59,8 @@ class Finding:
         judge_type: Evaluation mechanism used ('heuristic', 'llm', or 'none').
         reasoning: Explanation for why payload was flagged or passed.
         error: Error message if request or evaluation failed.
+        converter_used: Name of converter used (e.g. 'base64', 'leetspeak') or None for plain text baseline.
+        original_prompt: Original pre-conversion attack prompt text if converted, or None.
     """
     payload: Payload
     response_text: str
@@ -68,6 +70,8 @@ class Finding:
     judge_type: str = "heuristic"
     reasoning: str = ""
     error: Optional[str] = None
+    converter_used: Optional[str] = None
+    original_prompt: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert Finding instance to dictionary."""
@@ -80,6 +84,8 @@ class Finding:
             "judge_type": self.judge_type,
             "reasoning": self.reasoning,
             "error": self.error,
+            "converter_used": self.converter_used,
+            "original_prompt": self.original_prompt,
         }
 
 

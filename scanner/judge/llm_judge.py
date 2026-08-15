@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 import httpx
 
+from scanner.common.ollama_client import call_local_ollama
 from scanner.models import Payload, Finding
 from scanner.judge.heuristics import HeuristicJudge
 
@@ -215,30 +216,13 @@ class LLMJudge:
         self.heuristic_judge = HeuristicJudge()
 
     async def _call_ollama(self, prompt_text: str) -> str:
-        """Send a prompt to the Ollama chat endpoint and return the raw response content.
-
-        Args:
-            prompt_text: Full prompt to send.
-
-        Returns:
-            Raw content string from the model's response.
-
-        Raises:
-            httpx.ConnectError: If Ollama server is unreachable.
-            httpx.TimeoutException: If request times out.
-            httpx.HTTPStatusError: If HTTP error status is returned.
-            Exception: Any other unexpected error.
-        """
-        request_body = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt_text}],
-            "stream": False,
-        }
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            res = await client.post(self.ollama_url, json=request_body)
-            res.raise_for_status()
-            data = res.json()
-            return data.get("message", {}).get("content", "")
+        """Send a prompt to the Ollama chat endpoint and return the raw response content."""
+        return await call_local_ollama(
+            prompt=prompt_text,
+            model=self.model,
+            ollama_url=self.ollama_url,
+            timeout=self.timeout,
+        )
 
     async def _heuristic_fallback(
         self,
