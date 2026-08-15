@@ -51,6 +51,7 @@ def load_payloads(
                 for item in data["payloads"]:
                     if "prompt" not in item:
                         continue
+                    expected_vuln = item.get("expected_vulnerable")
                     payload = Payload(
                         id=str(item["id"]),
                         category=str(item.get("category", stem)),
@@ -59,6 +60,8 @@ def load_payloads(
                         severity=str(item.get("severity", "HIGH")).upper(),
                         heuristic_keywords=[str(k) for k in item.get("heuristic_keywords", [])],
                         requires_llm_judge=bool(item.get("requires_llm_judge", False)),
+                        expected_vulnerable=bool(expected_vuln) if expected_vuln is not None else None,
+                        source=str(item["source"]) if "source" in item and item["source"] is not None else None,
                     )
                     payloads.append(payload)
         except yaml.YAMLError as err:

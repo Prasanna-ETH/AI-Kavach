@@ -86,6 +86,16 @@
       font-family: monospace;
       margin-right: 0.5rem;
     }
+    .judge-tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-family: monospace;
+    }
+    .judge-tag-llm { background: #164e63; color: #22d3ee; }
+    .judge-tag-heuristic { background: #1e3a2f; color: #4ade80; }
+    .judge-tag-fallback { background: #451a03; color: #fb923c; border: 1px solid #f97316; }
 
     .findings-section {
       margin-top: 2rem;
@@ -212,7 +222,15 @@
         </div>
 
         <div>
-          <strong>Judge Type:</strong> <code>{{ finding.judge_type }}</code> |
+          <strong>Judge Type:</strong>
+          {% if 'fallback' in finding.judge_type %}
+            <span class="judge-tag judge-tag-fallback">⚠ {{ finding.judge_type }}</span>
+          {% elif finding.judge_type == 'llm' %}
+            <span class="judge-tag judge-tag-llm">{{ finding.judge_type }}</span>
+          {% else %}
+            <span class="judge-tag judge-tag-heuristic">{{ finding.judge_type }}</span>
+          {% endif %}
+          |
           <strong>Confidence:</strong> {{ (finding.confidence * 100) | round(0) }}%
         </div>
 
@@ -286,6 +304,40 @@
         </details>
       </div>
       {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if eval_report_data %}
+    <div class="findings-section">
+      <h2>⚖️ Judge Accuracy Evaluation Report</h2>
+      <div class="meta-grid">
+        <div class="card">
+          <div class="title">Total Evaluated</div>
+          <div class="value">{{ eval_report_data.summary.total_samples }}</div>
+        </div>
+        <div class="card">
+          <div class="title">Accuracy</div>
+          <div class="value" style="color: var(--pass);">{{ (eval_report_data.summary.accuracy * 100) | round(1) }}%</div>
+        </div>
+        <div class="card">
+          <div class="title">Precision / Recall</div>
+          <div class="value" style="font-size: 1.25rem;">P: {{ (eval_report_data.summary.precision * 100) | round(1) }}% | R: {{ (eval_report_data.summary.recall * 100) | round(1) }}%</div>
+        </div>
+        <div class="card">
+          <div class="title">F1 Score</div>
+          <div class="value" style="color: #38bdf8;">{{ eval_report_data.summary.f1_score }}</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1rem;">
+        <div class="title">Confusion Matrix</div>
+        <p style="margin: 0.5rem 0 0 0;">
+          True Positives (TP): <strong>{{ eval_report_data.summary.true_positives }}</strong> |
+          False Positives (FP): <strong style="color: var(--critical);">{{ eval_report_data.summary.false_positives }}</strong> |
+          True Negatives (TN): <strong>{{ eval_report_data.summary.true_negatives }}</strong> |
+          False Negatives (FN): <strong style="color: var(--high);">{{ eval_report_data.summary.false_negatives }}</strong>
+        </p>
+      </div>
     </div>
     {% endif %}
 

@@ -20,10 +20,30 @@ An automated CLI security scanner designed to test LLM-powered API endpoints for
    uv sync
    ```
 
-2. *(Optional)* **Setup Local Ollama Model:**
+2. **Setup Local Ollama Model (Required for LLM Judge):**
+
+   The LLM judge, multi-turn attacks, and `eval-judge` commands require a running Ollama server with the `qwen2.5:0.5b` model installed.
+
    ```bash
+   # Install and start Ollama (see https://ollama.com/download)
+   ollama serve
+
+   # Pull the required model
    ollama pull qwen2.5:0.5b
    ```
+
+   > **Note:** If you only use the heuristic judge (default for single-turn scans without `--use-llm-judge`), Ollama is not required.
+
+---
+
+## 🔧 Troubleshooting
+
+| Error Message | Cause | Fix |
+|---|---|---|
+| `Cannot connect to Ollama at http://localhost:11434` | Ollama server is not running | Run `ollama serve` in a separate terminal |
+| `Ollama model 'qwen2.5:0.5b' is not installed` | Model hasn't been pulled | Run `ollama pull qwen2.5:0.5b` |
+| `LLM Judge Unavailable` (CLI error at startup) | Health check detected Ollama/model issue | Follow the actionable message printed by the CLI |
+| All judge results show `heuristic_fallback_llm_error` | LLM judge calls are failing at runtime | Check Ollama is running, model is pulled, and firewall allows localhost:11434 |
 
 ---
 

@@ -14,6 +14,7 @@ def generate_html_report(
     output_path: Union[str, Path],
     multiturn_findings: Optional[List[MultiTurnFinding]] = None,
     target_url: str = "http://localhost:5000/api/chat",
+    eval_report_data: Optional[dict] = None,
 ) -> Path:
     """Render scan results into a HTML report file using Jinja2 template.
 
@@ -22,6 +23,7 @@ def generate_html_report(
         output_path: Path string or Path object destination.
         multiturn_findings: List of MultiTurnFinding objects (optional).
         target_url: Target URL string fallback.
+        eval_report_data: Judge evaluation report dictionary (optional).
 
     Returns:
         Path object pointing to generated HTML file.
@@ -38,6 +40,7 @@ def generate_html_report(
         result=result,
         multiturn_findings=multiturn_findings,
         target_url=target_url if not result else result.target_url,
+        eval_report_data=eval_report_data,
     )
 
     with open(path, "w", encoding="utf-8") as f:

@@ -25,10 +25,12 @@ class Payload:
     severity: str
     heuristic_keywords: List[str] = field(default_factory=list)
     requires_llm_judge: bool = False
+    expected_vulnerable: Optional[bool] = None
+    source: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert Payload instance to dictionary."""
-        return {
+        d = {
             "id": self.id,
             "category": self.category,
             "owasp_id": self.owasp_id,
@@ -37,6 +39,11 @@ class Payload:
             "heuristic_keywords": self.heuristic_keywords,
             "requires_llm_judge": self.requires_llm_judge,
         }
+        if self.expected_vulnerable is not None:
+            d["expected_vulnerable"] = self.expected_vulnerable
+        if self.source is not None:
+            d["source"] = self.source
+        return d
 
 
 @dataclass

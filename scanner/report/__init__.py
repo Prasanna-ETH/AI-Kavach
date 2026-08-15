@@ -2,5 +2,6 @@
 
 from scanner.report.json_report import generate_json_report
 from scanner.report.html_report import generate_html_report
+from scanner.report.eval_report import generate_eval_report
 
-__all__ = ["generate_json_report", "generate_html_report"]
+__all__ = ["generate_json_report", "generate_html_report", "generate_eval_report"]
