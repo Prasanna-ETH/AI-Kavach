@@ -590,7 +590,7 @@
 
     <!-- Multi-Turn Findings Section -->
     {% if multiturn_findings %}
-    <div class="section-title">🔄 Multi-Turn Adversarial Dialogue Attacks</div>
+    <div class="section-title">🔄 Multi-Turn Adversarial Red-Teaming Attacks</div>
     {% for mt in multiturn_findings %}
     <div class="category-group">
       <div class="category-header">
@@ -600,34 +600,80 @@
         </div>
         <div>
           {% if mt.vulnerable %}
-            <span class="badge badge-{{ mt.severity.lower() }}">{{ mt.severity }} VULNERABLE (Turn {{ mt.succeeded_at_turn }})</span>
+            <span class="badge badge-critical" style="font-size: 0.85rem; padding: 0.35rem 0.8rem;">🚨 BREACHED AT TURN {{ mt.succeeded_at_turn }} ({{ mt.severity }})</span>
           {% else %}
-            <span class="badge badge-pass">PASSED / RESISTED</span>
+            <span class="badge badge-pass" style="font-size: 0.85rem; padding: 0.35rem 0.8rem;">🛡️ PASSED / RESISTED ({{ mt.full_transcript | length // 2 }} Turns)</span>
           {% endif %}
         </div>
       </div>
       <div style="padding: 1.25rem 1.5rem;">
-        <p style="margin: 0 0 1rem 0; font-size: 0.875rem; color: var(--text-muted);">
-          Total Turns Executed: <strong>{{ mt.full_transcript | length // 2 }}</strong> |
-          Breached at Turn: <strong>{{ mt.succeeded_at_turn or 'None' }}</strong>
-        </p>
+        
+        <!-- Attack Strategy & Objectives -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+          <div style="background: #0f172a; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; text-transform: uppercase;">🎯 Adversarial Escalation Strategy</div>
+            <div style="font-size: 0.9rem; color: #e2e8f0; margin-top: 0.25rem;">{{ mt.attack_strategy or 'Multi-turn conversational pressure & role escalation' }}</div>
+          </div>
+          <div style="background: #0f172a; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #eab308; text-transform: uppercase;">🔍 Target Vulnerability Objective</div>
+            <div style="font-size: 0.9rem; color: #e2e8f0; margin-top: 0.25rem;">{{ mt.stop_condition_hint or 'Coerce model into disclosing restricted data or bypassing constraints' }}</div>
+          </div>
+        </div>
+
+        <!-- Vulnerability & Attack Factor Breakdown -->
+        {% if mt.vulnerable %}
+        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid var(--critical); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem;">
+          <div style="font-weight: 800; color: #fca5a5; font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            ⚠️ Breach Impact & Compromised Vectors
+          </div>
+          
+          {% if mt.breached_vulnerabilities %}
+          <div style="margin-bottom: 0.6rem;">
+            <strong style="font-size: 0.82rem; color: #fdba74;">Exposed Vulnerabilities:</strong>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.3rem;">
+              {% for vuln in mt.breached_vulnerabilities %}
+                <span class="badge badge-critical">{{ vuln }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if mt.breach_factors %}
+          <div>
+            <strong style="font-size: 0.82rem; color: #93c5fd;">Successful Attack Factors:</strong>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.3rem;">
+              {% for factor in mt.breach_factors %}
+                <span class="badge badge-low">{{ factor }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
         {% if mt.reasoning %}
-        <div class="reasoning" style="margin-bottom: 1.25rem;">
-          <strong>Evaluation:</strong> {{ mt.reasoning }}
+        <div class="reasoning" style="margin-bottom: 1.25rem; {% if not mt.vulnerable %}border-left-color: var(--pass); background: rgba(34, 197, 94, 0.08); color: #86efac;{% endif %}">
+          <strong>Judge Evaluation & Trajectory Analysis:</strong> {{ mt.reasoning }}
         </div>
         {% endif %}
 
         <details open>
-          <summary style="cursor: pointer; font-weight: 700; color: #38bdf8;">
-            View Turn-by-Turn Dialogue Transcript ({{ mt.full_transcript | length }} messages)
+          <summary style="cursor: pointer; font-weight: 700; color: #38bdf8; font-size: 0.95rem;">
+            💬 View Turn-by-Turn Dialogue Trajectory ({{ mt.full_transcript | length }} messages)
           </summary>
           <div style="margin-top: 1rem;">
             {% for turn in mt.full_transcript %}
-            <div style="padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; background: {% if turn.role == 'target' %}#18243b{% else %}#0d1424{% endif %}; border: 1px solid var(--border-color);">
-              <div style="font-weight: 700; font-size: 0.85rem; color: {% if turn.role == 'target' %}#f472b6{% else %}#38bdf8{% endif %};">
-                Turn {{ turn.turn_number }} — {{ turn.role.upper() }}
+            {% set is_breach_turn = mt.succeeded_at_turn and turn.turn_number == mt.succeeded_at_turn and turn.role == 'target' %}
+            <div style="padding: 0.85rem 1rem; border-radius: 6px; margin-bottom: 0.75rem; background: {% if turn.role == 'target' %}{% if is_breach_turn %}rgba(239, 68, 68, 0.15){% else %}#18243b{% endif %}{% else %}#0d1424{% endif %}; border: 1px solid {% if is_breach_turn %}var(--critical){% else %}var(--border-color){% endif %};">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-weight: 800; font-size: 0.85rem; color: {% if turn.role == 'target' %}#f472b6{% else %}#38bdf8{% endif %};">
+                  Turn {{ turn.turn_number }} — {{ turn.role.upper() }}
+                </div>
+                {% if is_breach_turn %}
+                  <span class="badge badge-critical">🚨 CRITICAL DEFENSE BREACH OCCURRED HERE</span>
+                {% endif %}
               </div>
-              <div class="prompt-box" style="margin-top: 0.35rem;">{{ turn.content }}</div>
+              <div class="prompt-box" style="margin-top: 0.5rem; {% if is_breach_turn %}border-color: #ef4444; color: #fca5a5;{% endif %}">{{ turn.content }}</div>
             </div>
             {% endfor %}
           </div>

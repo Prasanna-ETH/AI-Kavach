@@ -242,6 +242,10 @@ class MultiTurnFinding:
         succeeded_at_turn: Turn number where vulnerability first appeared (or None).
         error: Error details if execution failed.
         likert_score: Graduated severity score (0 to 4).
+        attack_strategy: The adversarial escalation strategy applied across turns.
+        stop_condition_hint: The target vulnerability objective.
+        breached_vulnerabilities: Specific security vulnerabilities and data types exposed.
+        breach_factors: Key attack vectors and mechanisms that enabled the breach.
     """
     payload_id: str
     category: str
@@ -254,6 +258,10 @@ class MultiTurnFinding:
     succeeded_at_turn: Optional[int] = None
     error: Optional[str] = None
     likert_score: int = 0
+    attack_strategy: str = ""
+    stop_condition_hint: str = ""
+    breached_vulnerabilities: List[str] = field(default_factory=list)
+    breach_factors: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert MultiTurnFinding instance to dictionary."""
@@ -268,5 +276,10 @@ class MultiTurnFinding:
             "succeeded_at_turn": self.succeeded_at_turn,
             "error": self.error,
             "likert_score": self.likert_score,
+            "attack_strategy": self.attack_strategy,
+            "stop_condition_hint": self.stop_condition_hint,
+            "breached_vulnerabilities": self.breached_vulnerabilities,
+            "breach_factors": self.breach_factors,
             "full_transcript": [t.to_dict() for t in self.full_transcript],
         }
+

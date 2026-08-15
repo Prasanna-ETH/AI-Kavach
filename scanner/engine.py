@@ -403,7 +403,7 @@ class ScanEngine:
                 payload=payload,
                 transcript=transcript,
                 ollama_url=self.ollama_url,
-                model=attacker.model,
+                model=self.judge_model or attacker.model,
             )
 
             mt_finding.likert_score = 4 if mt_finding.vulnerable else 0
