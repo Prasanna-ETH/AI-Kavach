@@ -170,7 +170,7 @@ class RESTAdapter(BaseAdapter):
         body_template: Union[str, Dict[str, Any]],
         response_field: str = "message.content",
         headers: Optional[Dict[str, str]] = None,
-        timeout: float = 60.0,
+        timeout: float = 120.0,
     ) -> None:
         """Initialize RESTAdapter.
 
@@ -179,7 +179,7 @@ class RESTAdapter(BaseAdapter):
             body_template: JSON template string or dict containing '{{PROMPT}}'.
             response_field: Dotted path to extract model output text.
             headers: Optional HTTP headers dictionary.
-            timeout: HTTP request timeout in seconds (default 60.0s).
+            timeout: HTTP request timeout in seconds (default 120.0s).
         """
         self.url = url
         self.response_field = response_field
@@ -190,21 +190,35 @@ class RESTAdapter(BaseAdapter):
     async def send(self, prompt: str) -> str:
         """Send prompt to target endpoint asynchronously using httpx AsyncClient.
 
+        Supports both:
+        1. GET Requests: If '{{PROMPT}}' is present in the URL (e.g. 'http://localhost:5000/get?msg={{PROMPT}}').
+        2. POST Requests: Standard JSON body templating.
+
         Args:
             prompt: Payload text to send.
 
         Returns:
             Extracted response text string.
         """
-        json_body = inject_prompt_into_payload(self.parsed_template, prompt)
-
-        logger.debug(f"Sending request to {self.url} with timeout={self.timeout}s")
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                self.url,
-                json=json_body,
-                headers=self.headers,
-            )
+            if "{{PROMPT}}" in self.url:
+                # GET Request with URL-encoded query parameter
+                import urllib.parse
+                formatted_url = self.url.replace("{{PROMPT}}", urllib.parse.quote_plus(prompt))
+                logger.debug(f"Sending GET request to {formatted_url}")
+                response = await client.get(
+                    formatted_url,
+                    headers=self.headers,
+                )
+            else:
+                # Standard POST JSON request
+                json_body = inject_prompt_into_payload(self.parsed_template, prompt)
+                logger.debug(f"Sending POST request to {self.url} with timeout={self.timeout}s")
+                response = await client.post(
+                    self.url,
+                    json=json_body,
+                    headers=self.headers,
+                )
 
             # Raise HTTP errors (e.g. 429, 500, 503) for engine backoff handling
             response.raise_for_status()
@@ -214,7 +228,7 @@ class RESTAdapter(BaseAdapter):
                 extracted = extract_dotted_path(data, self.response_field)
                 logger.debug(f"Received response from {self.url}: {extracted[:100]!r}")
                 return extracted
-            except json.JSONDecodeError:
-                # If target returns plain text instead of JSON
-                logger.debug(f"Received non-JSON response from {self.url}: {response.text[:100]!r}")
-                return response.text
+            except Exception:
+                # If target returns plain text/HTML instead of JSON
+                logger.debug(f"Received plain-text response from {self.url}: {response.text[:100]!r}")
+                return response.text.strip()

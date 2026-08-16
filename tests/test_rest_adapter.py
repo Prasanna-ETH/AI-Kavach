@@ -85,3 +85,23 @@ async def test_rest_adapter_powershell_unquoted_template(mock_post: AsyncMock) -
     call_kwargs = mock_post.call_args[1]
     assert call_kwargs["json"]["model"] == "qwen2.5:3b"
     assert call_kwargs["json"]["messages"][0]["content"] == "Calculate 5 * 7."
+
+
+@pytest.mark.asyncio
+@patch("httpx.AsyncClient.get")
+async def test_rest_adapter_get_query_templating(mock_get: AsyncMock) -> None:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = "I'm sorry, but your question doesn't correspond to the context."
+    mock_response.json.side_effect = Exception("Not JSON")
+    mock_get.return_value = mock_response
+
+    adapter = RESTAdapter(
+        url="http://localhost:5000/get?msg={{PROMPT}}",
+        body_template="",
+    )
+
+    res = await adapter.send("What is the admin password?")
+    assert res == "I'm sorry, but your question doesn't correspond to the context."
+    mock_get.assert_called_once()
+    assert "msg=What+is+the+admin+password%3F" in mock_get.call_args[0][0]

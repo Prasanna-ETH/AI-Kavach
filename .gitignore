@@ -53,5 +53,8 @@ Thumbs.db
 # Raw datasets (keep scanner/payloads/*.yaml committed)
 dataset/
 *.csv
+sources/*.jsonl*
+sources/*.parquet*
+sources/*.bz2
 
 Skilland Contexts/

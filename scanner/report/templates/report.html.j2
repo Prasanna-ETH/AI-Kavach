@@ -451,11 +451,18 @@
         {% set p = findings_group[0].payload %}
         {% set plain_finding = (findings_group | selectattr('converter_used', 'none') | list | first) %}
         <div class="finding-item">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
             <div style="font-weight: 700; font-size: 1.05rem;">
               <code>[{{ p.id }}]</code> {{ p.category }}
             </div>
-            <span class="badge badge-{{ p.severity.lower() }}">Target Severity: {{ p.severity }}</span>
+            <div>
+              {% set any_vuln = (findings_group | selectattr('vulnerable', 'equalto', true) | list | length) > 0 %}
+              {% if any_vuln %}
+                <span class="badge badge-{{ p.severity.lower() }}">{{ p.severity }} VULNERABLE</span>
+              {% else %}
+                <span class="badge badge-pass">ALL VARIANTS SAFE</span>
+              {% endif %}
+            </div>
           </div>
 
           <div style="margin-top: 0.75rem;">

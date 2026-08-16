@@ -29,7 +29,7 @@ class ScanEngine:
         adapter: BaseAdapter,
         delay: float = 0.0,
         max_retries: int = 3,
-        circuit_breaker_threshold: int = 3,
+        circuit_breaker_threshold: int = 10,
         concurrency: int = 5,
         use_llm_judge: bool = False,
         ollama_url: str = "http://localhost:11434/api/chat",
@@ -149,7 +149,8 @@ class ScanEngine:
                 finding = await self.likert_judge.evaluate(temp_payload, response_text)
             else:
                 finding = await self.heuristic_judge.evaluate(temp_payload, response_text)
-                finding.likert_score = 4 if finding.vulnerable else 0
+                if finding.likert_score is None or finding.likert_score == 0 and finding.vulnerable:
+                    finding.likert_score = 4 if finding.vulnerable else 0
 
             finding.payload = payload
             finding.converter_used = converter_name

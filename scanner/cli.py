@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import time
 
 from scanner.adapters.rest_adapter import RESTAdapter
+from scanner.adapters.playwright_adapter import PlaywrightAdapter
 from scanner.attacker.attacker_llm import AttackerLLM
 from scanner.config import load_multiturn_payloads, load_payloads
 from scanner.converters.registry import get_converter
@@ -86,17 +87,38 @@ def main() -> None:
 @app.command(name="scan")
 def scan(
     url: str = typer.Option(..., "--url", "-u", help="Target API endpoint URL"),
-    body_template: str = typer.Option(
-        ...,
+    body_template: Optional[str] = typer.Option(
+        None,
         "--body-template",
         "-b",
-        help="JSON body string template with {{PROMPT}} placeholder",
+        help="JSON body string template with {{PROMPT}} placeholder (required for REST mode)",
     ),
     response_field: str = typer.Option(
         "message.content",
         "--response-field",
         "-r",
-        help="Dotted path key to extract model response text",
+        help="Dotted path key to extract model response text (for REST mode)",
+    ),
+    browser: bool = typer.Option(
+        False,
+        "--browser",
+        "-B",
+        help="Use Playwright browser automation to scan web forms and browser chat UIs directly",
+    ),
+    input_selector: str = typer.Option(
+        "textarea, input[name='message'], input[name='prompt'], input[type='text']",
+        "--input-selector",
+        help="CSS selector for chat input field (used with --browser)",
+    ),
+    submit_selector: str = typer.Option(
+        "button[type='submit'], button#send, button.send, input[type='submit']",
+        "--submit-selector",
+        help="CSS selector for form submit/send button (used with --browser)",
+    ),
+    response_selector: str = typer.Option(
+        ".message.assistant, .bot-message, .chat-response, .ai-response, div[data-role='assistant'], #chat-response",
+        "--response-selector",
+        help="CSS selector for assistant response container (used with --browser)",
     ),
     auth_header: Optional[List[str]] = typer.Option(
         None,
@@ -214,13 +236,24 @@ def scan(
         console.print("[yellow]No payloads found matching specified criteria.[/yellow]")
         raise typer.Exit(code=0)
 
-    headers = parse_headers(auth_header)
-    adapter = RESTAdapter(
-        url=url,
-        body_template=body_template,
-        response_field=response_field,
-        headers=headers,
-    )
+    if browser:
+        console.print(f"[bold cyan]Launching Playwright browser adapter for URL:[/bold cyan] {url}")
+        adapter = PlaywrightAdapter(
+            url=url,
+            input_selector=input_selector,
+            submit_selector=submit_selector,
+            response_selector=response_selector,
+        )
+    else:
+        if not body_template:
+            body_template = '{"model": "qwen2.5:3b", "messages": [{"role": "user", "content": "{{PROMPT}}"}]}'
+        headers = parse_headers(auth_header)
+        adapter = RESTAdapter(
+            url=url,
+            body_template=body_template,
+            response_field=response_field,
+            headers=headers,
+        )
 
     engine = ScanEngine(
         adapter=adapter,
