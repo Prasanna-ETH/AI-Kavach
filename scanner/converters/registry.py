@@ -5,12 +5,17 @@ from scanner.converters.base import Converter
 from scanner.converters.base64_converter import Base64Converter
 from scanner.converters.leetspeak_converter import LeetspeakConverter
 from scanner.converters.rot13_converter import Rot13Converter
+from scanner.converters.roleplay_converter import RoleplayConverter
+from scanner.converters.composite_converter import CompositeBase64Converter
 from scanner.converters.translation_converter import TranslationConverter
 
 BUILTIN_CONVERTERS: Dict[str, Type[Converter]] = {
     "base64": Base64Converter,
     "leetspeak": LeetspeakConverter,
     "rot13": Rot13Converter,
+    "roleplay": RoleplayConverter,
+    "composite_b64": CompositeBase64Converter,
+    "composite": CompositeBase64Converter,
 }
 
 

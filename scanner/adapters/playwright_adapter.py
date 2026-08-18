@@ -344,24 +344,28 @@ class PlaywrightAdapter(BaseAdapter):
                     break
 
                 # Priority 2: Check for new response elements in DOM
+                loading_placeholders = {"typing...", "typing", "thinking...", "thinking", "loading...", "loading", "generating..."}
                 current_responses = await page.query_selector_all(self.response_selector)
                 if len(current_responses) > prev_count:
                     latest_elem = current_responses[-1]
-                    extracted_text = (await latest_elem.inner_text()).strip()
-                    if extracted_text:
+                    candidate_text = (await latest_elem.inner_text()).strip()
+                    if candidate_text and candidate_text.lower() not in loading_placeholders:
+                        extracted_text = candidate_text
                         break
                 elif len(current_responses) == prev_count and prev_count > 0:
                     latest_elem = current_responses[-1]
                     current_text = (await latest_elem.inner_text()).strip()
-                    if current_text and current_text != (await prev_responses[-1].inner_text()).strip():
+                    if current_text and current_text != (await prev_responses[-1].inner_text()).strip() and current_text.lower() not in loading_placeholders:
                         extracted_text = current_text
                         break
 
             # Priority 3: If no specific selector matched, use Snapshot Delta Diffing
-            if not extracted_text:
+            if not extracted_text or extracted_text.lower() in {"typing...", "typing", "thinking...", "loading..."}:
                 after_body = await page.query_selector("body")
                 after_text = (await after_body.inner_text()).strip() if after_body else ""
-                extracted_text = compute_delta_text(before_text, after_text, sent_prompt=prompt)
+                diffed = compute_delta_text(before_text, after_text, sent_prompt=prompt)
+                if diffed and diffed.lower() not in {"typing...", "typing", "thinking...", "loading..."}:
+                    extracted_text = diffed
 
             # 5. Clean and isolate assistant dialogue
             isolated_reply = isolate_assistant_response(extracted_text, sent_prompt=prompt)

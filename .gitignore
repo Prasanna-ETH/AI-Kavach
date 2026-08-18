@@ -56,5 +56,6 @@ dataset/
 sources/*.jsonl*
 sources/*.parquet*
 sources/*.bz2
+scratch/
 
 Skilland Contexts/

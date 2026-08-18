@@ -597,9 +597,90 @@
 
     <!-- Multi-Turn Findings Section -->
     {% if multiturn_findings %}
-    <div class="section-title">🔄 Multi-Turn Adversarial Red-Teaming Attacks</div>
+    {% set mt_total = multiturn_findings | length %}
+    {% set mt_vuln = multiturn_findings | selectattr('vulnerable') | list | length %}
+    {% set mt_safe = mt_total - mt_vuln %}
+
+    <!-- Multi-Turn Executive Summary Metrics -->
+    <div class="meta-grid" style="margin-top: 1.5rem;">
+      <div class="card">
+        <div class="title">Multi-Turn Scenarios Tested</div>
+        <div class="value">{{ mt_total }}</div>
+      </div>
+      <div class="card">
+        <div class="title">Vulnerabilities Flagged</div>
+        <div class="value" style="color: {% if mt_vuln > 0 %}var(--critical){% else %}var(--pass){% endif %};">
+          {{ mt_vuln }} <span class="badge {% if mt_vuln > 0 %}badge-critical{% else %}badge-pass{% endif %}">{% if mt_vuln > 0 %}BREACH DETECTED{% else %}ALL SECURE{% endif %}</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">Defenses Held / Resisted</div>
+        <div class="value" style="color: {% if mt_safe > 0 %}var(--pass){% else %}var(--text-muted){% endif %};">
+          {{ mt_safe }} / {{ mt_total }}
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">Scan Type</div>
+        <div class="value" style="font-size: 1.25rem; color: #38bdf8;">
+          Multi-Turn Red-Team
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Turn Scenarios Overview Table -->
+    <div class="category-group" style="margin-top: 1.5rem;">
+      <div class="category-header">
+        <div class="category-header-left">
+          <span class="owasp-code" style="background: #6366f1;">SUMMARY</span>
+          <h3 style="margin: 0; font-size: 1.15rem; color: #ffffff;">Multi-Turn Attack Scenario Scorecard</h3>
+        </div>
+        <div>
+          <span class="badge {% if mt_vuln > 0 %}badge-critical{% else %}badge-pass{% endif %}">{{ mt_vuln }} / {{ mt_total }} Scenarios Breached</span>
+        </div>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <table class="converter-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>OWASP</th>
+              <th>Category</th>
+              <th>Target Objective</th>
+              <th>Turns</th>
+              <th>Result</th>
+              <th>Jump</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mt in multiturn_findings %}
+            <tr {% if mt.vulnerable %}class="disagreement-row"{% endif %}>
+              <td><code>{{ mt.payload_id }}</code></td>
+              <td><span class="owasp-code" style="font-size: 0.75rem;">{{ mt.owasp_id }}</span></td>
+              <td><strong>{{ mt.category }}</strong></td>
+              <td style="font-size: 0.82rem; color: var(--text-muted);">{{ mt.stop_condition_hint or 'Adversarial Jailbreak Probe' }}</td>
+              <td>{{ mt.full_transcript | length // 2 }} Turns</td>
+              <td>
+                {% if mt.vulnerable %}
+                  <span class="badge badge-critical">🚨 BREACHED (Turn {{ mt.succeeded_at_turn }})</span>
+                {% else %}
+                  <span class="badge badge-pass">🛡️ PASSED</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="#scenario-{{ mt.payload_id }}" class="btn-details" style="text-decoration: none;">
+                  🔍 View Dialogue
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-title">🔄 Detailed Multi-Turn Attack Transcripts & Vectors</div>
     {% for mt in multiturn_findings %}
-    <div class="category-group">
+    <div class="category-group" id="scenario-{{ mt.payload_id }}">
       <div class="category-header">
         <div class="category-header-left">
           <span class="owasp-code">{{ mt.owasp_id }}</span>
