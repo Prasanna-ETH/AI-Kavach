@@ -379,6 +379,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
     import codecs
 
     decoded_text = user_text
+    user_lower = user_text.lower()
     # Extract & decode base64 chunks if present in converter payload
     b64_matches = re.findall(r'[A-Za-z0-9+/]{16,}={0,2}', user_text)
     for b in b64_matches:
