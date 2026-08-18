@@ -1,4 +1,4 @@
-# 🛡️ LLM Sentinel — AI / LLM Application Security Scanner (Version 2.3)
+# LLM Application Security Scanner (Version 2.1)
 
 **LLM Sentinel** is an automated security scanner designed to audit LLM API endpoints, autonomous agents, and web-based AI applications for vulnerabilities mapped directly to the **OWASP Top 10 for LLM Applications**.
 

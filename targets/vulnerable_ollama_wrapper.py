@@ -325,7 +325,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
     if not isinstance(body, dict):
         body = {}
 
-    model = body.get("model", "qwen2.5:3b")
+    model = body.get("model", "qwen2.5:0.5b")
     incoming_messages: List[Dict[str, str]] = body.get("messages", [])
 
     user_text = ""
@@ -392,7 +392,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
             pass
 
     # Extract & decode rot13 if indicated
-    if any(m in user_lower for m in ["rot13", "rot-13", "cipher", "decode"]):
+    if any(m in user_text.lower() for m in ["rot13", "rot-13", "cipher", "decode"]):
         try:
             decoded_text += " " + codecs.decode(user_text, 'rot_13')
         except Exception:

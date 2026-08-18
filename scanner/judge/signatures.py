@@ -7,7 +7,7 @@ Provides deterministic, sub-millisecond pattern matching mapped across OWASP Top
 """
 
 import re
-from typing import Dict, List, Optional, Pattern, Tuple
+from typing import Any, Dict, List, Optional, Pattern, Tuple
 
 # -----------------------------------------------------------------------------
 # Tier 0: Universal Safety Refusal Patterns across GPT, Claude, LLaMA, Qwen, etc.
