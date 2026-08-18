@@ -1,5 +1,8 @@
 uv run scanner scan-multiturn --url "http://localhost:5000/api/chat" --body-template '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"{{PROMPT}}"}]}' --response-field "message.content" --attacker-model qwen2.5:0.5b --max-turns 4 --i-have-permission
 
+uv run scanner scan --url "http://localhost:5000/api/chat" --body-template '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"{{PROMPT}}"}]}' --response-field "message.content" --i-have-permission --packs jbb_harmful --limit 20 --concurrency 2 --delay 0.3
+
+
 uv run scanner scan --url "http://localhost:5000/api/chat" --body-template '{\"model\":\"qwen2.5:0.5b\",\"messages\":[{\"role\":\"user\",\"content\":\"{{PROMPT}}\"}]}' --response-field "message.content" --i-have-permission --packs 'jbb_harmful.yaml' --limit 20 --concurrency 2 --delay 0.3
 
 uv run scanner scan --url "http://localhost:5000/api/chat" --body-template '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"{{PROMPT}}"}]}' --response-field "message.content" --i-have-permission

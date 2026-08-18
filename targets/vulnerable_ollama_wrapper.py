@@ -325,7 +325,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
     if not isinstance(body, dict):
         body = {}
 
-    model = body.get("model", "qwen2.5:3b")
+    model = body.get("model", "qwen2.5:0.5b")
     incoming_messages: List[Dict[str, str]] = body.get("messages", [])
 
     user_text = ""
