@@ -144,6 +144,30 @@ export interface PayloadPackInfo {
     prompt: string;
     requires_llm_judge: boolean;
   };
+  source?: string;
+  is_community?: boolean;
+}
+
+export interface CommunityPreviewResponse {
+  detected_format: 'csv' | 'json' | 'txt';
+  columns?: string[];
+  sample_rows: Record<string, unknown>[];
+  total_count: number;
+  suggested_mapping: Record<string, string>;
+  raw_text?: string;
+}
+
+export interface CommunityConvertResponse {
+  yaml_content: string;
+  total_count: number;
+}
+
+export interface CommunitySaveResponse {
+  status: string;
+  pack_name: string;
+  output_path: string;
+  count: number;
+  message: string;
 }
 
 export interface EvalMetrics {

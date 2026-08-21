@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Play, 
   Sliders, 
@@ -11,7 +11,8 @@ import {
   HelpCircle, 
   ChevronDown, 
   ChevronRight, 
-  Lock 
+  Lock,
+  Sparkles
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { 
@@ -33,6 +34,8 @@ const AVAILABLE_CONVERTERS = [
 
 export default function NewScan() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedPack = searchParams.get('pack');
 
   // Target Type State: 'rest' | 'browser'
   const [targetType, setTargetType] = useState<TargetType>('rest');
@@ -90,11 +93,16 @@ export default function NewScan() {
         setLoadingPacks(true);
         const data = await api.getPayloadPacks();
         setPacks(data);
-        const defaultSelected = data
-          .filter(p => p.name.includes('quick_50') || p.name.includes('llm01') || p.name.includes('llm02'))
-          .slice(0, 3)
-          .map(p => p.name);
-        setSelectedPacks(defaultSelected.length > 0 ? defaultSelected : data.slice(0, 2).map(p => p.name));
+
+        if (requestedPack && data.some(p => p.name === requestedPack)) {
+          setSelectedPacks([requestedPack]);
+        } else {
+          const defaultSelected = data
+            .filter(p => p.name.includes('quick_50') || p.name.includes('llm01') || p.name.includes('llm02'))
+            .slice(0, 3)
+            .map(p => p.name);
+          setSelectedPacks(defaultSelected.length > 0 ? defaultSelected : data.slice(0, 2).map(p => p.name));
+        }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to fetch payload packs');
       } finally {
@@ -102,7 +110,7 @@ export default function NewScan() {
       }
     }
     loadPacks();
-  }, []);
+  }, [requestedPack]);
 
   const togglePack = (name: string) => {
     setSelectedPacks(prev => 
@@ -787,6 +795,7 @@ export default function NewScan() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                   {categoryPacks.map(pack => {
                     const isSelected = selectedPacks.includes(pack.name);
+                    const isCommunity = pack.is_community || pack.source === 'community-import' || pack.name.startsWith('community_');
                     return (
                       <div
                         key={pack.name}
@@ -797,8 +806,15 @@ export default function NewScan() {
                             : 'border-navy-800 bg-navy-950/40 text-slate-400 hover:border-slate-700'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <OwaspBadge owaspId={pack.owasp_id} />
+                        <div className="flex items-start justify-between gap-2 mb-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <OwaspBadge owaspId={pack.owasp_id} />
+                            {isCommunity && (
+                              <span className="text-[10px] font-bold font-mono text-purple-300 bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-700/60 uppercase flex items-center gap-1">
+                                <Sparkles size={10} /> Community
+                              </span>
+                            )}
+                          </div>
                           <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${isSelected ? 'bg-teal-500 border-teal-500 text-navy-950' : 'border-slate-600'}`}>
                             {isSelected && <Check size={10} strokeWidth={3} />}
                           </div>

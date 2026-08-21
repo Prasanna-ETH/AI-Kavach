@@ -94,6 +94,73 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // POST /api/payloads/community/preview
+  previewCommunityPayloads: async (data: { file?: File; raw_text?: string }) => {
+    if (data.file) {
+      const formData = new FormData();
+      formData.append('file', data.file);
+      const res = await fetch('/api/payloads/community/preview', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        let message = `${res.status} ${res.statusText}`;
+        try {
+          const body = await res.json();
+          message = body.detail ?? message;
+        } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      return res.json() as Promise<import('../types').CommunityPreviewResponse>;
+    } else {
+      return request<import('../types').CommunityPreviewResponse>('/payloads/community/preview', {
+        method: 'POST',
+        body: JSON.stringify({ raw_text: data.raw_text }),
+      });
+    }
+  },
+
+  // POST /api/payloads/community/convert
+  convertCommunityPayloads: (body: {
+    source_data?: unknown;
+    raw_text?: string;
+    max_records?: number;
+    detected_format: string;
+    field_mapping: Record<string, string>;
+    default_category: string;
+    default_owasp_id: string;
+    default_severity: string;
+    default_expected_vulnerable?: boolean;
+  }) => request<import('../types').CommunityConvertResponse>('/payloads/community/convert', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
+
+  // POST /api/payloads/community/save
+  saveCommunityPayloadPack: (body: {
+    pack_name: string;
+    yaml_content: string;
+    confirmed_large_import?: boolean;
+  }) => request<import('../types').CommunitySaveResponse>('/payloads/community/save', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
+
+  // POST /api/scans/:scan_id/retest
+  retestPayload: (
+    scanId: string,
+    payloadId: string,
+    options?: { prompt?: string; converter_used?: string }
+  ) =>
+    request<Finding>('/scans/' + scanId + '/retest', {
+      method: 'POST',
+      body: JSON.stringify({
+        payload_id: payloadId,
+        prompt: options?.prompt,
+        converter_used: options?.converter_used,
+      }),
+    }),
+
   // Report URLs (FileResponse — use anchor href)
   reportHtmlUrl: (id: string) => `/api/scans/${id}/report/html`,
   reportJsonUrl: (id: string) => `/api/scans/${id}/report/json`,

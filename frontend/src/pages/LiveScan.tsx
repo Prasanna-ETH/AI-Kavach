@@ -6,7 +6,12 @@ import {
   ArrowRight,
   Layers,
   Terminal,
-  Activity
+  Activity,
+  RefreshCw,
+  RotateCw,
+  CheckCircle2,
+  Pencil,
+  X as XIcon
 } from 'lucide-react';
 import { api, openScanStream } from '../api/client';
 import type { Finding, ScanSummary } from '../types';
@@ -21,7 +26,8 @@ import {
   ErrorBanner, 
   EmptyState,
   TokenBadge,
-  TokenMetricsBanner
+  TokenMetricsBanner,
+  Spinner
 } from '../components';
 
 export default function LiveScan() {
@@ -35,6 +41,15 @@ export default function LiveScan() {
   const [streamActive, setStreamActive] = useState(true);
   const [activeTurnStatus, setActiveTurnStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Retest state
+  const [retestingKey, setRetestingKey] = useState<string | null>(null);
+  const [retestMessage, setRetestMessage] = useState<string | null>(null);
+
+  // Editable prompt state: rowKey -> current textarea value
+  const [editingPrompts, setEditingPrompts] = useState<Record<string, string>>({});
+  // Which rowKeys are in edit mode
+  const [editModeKeys, setEditModeKeys] = useState<Set<string>>(new Set());
 
   // If no ID in URL, fetch most recent running or most recent scan
   useEffect(() => {
@@ -126,6 +141,38 @@ export default function LiveScan() {
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleRetest = async (e: React.MouseEvent, finding: Finding, overridePrompt?: string) => {
+    e.stopPropagation();
+    if (!scanId) return;
+
+    const rowKey = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
+    const promptToSend = overridePrompt ?? finding.prompt;
+    try {
+      setRetestingKey(rowKey);
+      setRetestMessage(null);
+
+      const updated = await api.retestPayload(scanId, finding.payload_id, {
+        prompt: promptToSend,
+        converter_used: finding.converter_used,
+      });
+
+      setLiveFindings(prev => prev.map(f => {
+        const k = `${f.payload_id}-${f.converter_used || 'plain'}`;
+        return k === rowKey ? updated : f;
+      }));
+
+      // Exit edit mode and clear custom prompt after successful retest
+      setEditModeKeys(prev => { const s = new Set(prev); s.delete(rowKey); return s; });
+      setEditingPrompts(prev => { const n = { ...prev }; delete n[rowKey]; return n; });
+
+      setRetestMessage(`Payload ${finding.payload_id} Retested: ${updated.vulnerable ? '🔴 Vulnerable' : '✅ Passed'}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Retest request failed');
+    } finally {
+      setRetestingKey(null);
+    }
   };
 
   if (!scanId) {
@@ -252,7 +299,18 @@ export default function LiveScan() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Notification Toast for Retest */}
+        {retestMessage && (
+          <div className="p-3 bg-teal-950/60 border border-teal-800 text-teal-300 text-xs rounded-lg flex items-center justify-between font-mono animate-fadeIn mx-4 mt-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-teal-400 shrink-0" />
+              <span>{retestMessage}</span>
+            </div>
+            <button onClick={() => setRetestMessage(null)} className="text-slate-400 hover:text-white text-xs">Dismiss</button>
+          </div>
+        )}
+
+        <div className="data-table-container border-none rounded-none">
           <table className="data-table">
             <thead>
               <tr>
@@ -264,12 +322,13 @@ export default function LiveScan() {
                 <th>Outcome</th>
                 <th>Judge Mechanism</th>
                 <th>Token Usage</th>
+                <th className="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {liveFindings.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-xs text-slate-500">
+                  <td colSpan={9} className="text-center py-12 text-xs text-slate-500">
                     <Activity size={24} className="mx-auto mb-2 text-slate-600 animate-pulse" />
                     Waiting for initial payload dispatches from scan engine...
                   </td>
@@ -277,12 +336,18 @@ export default function LiveScan() {
               ) : (
                 liveFindings.map((finding, idx) => {
                   const rowKey = `${finding.payload_id}-${finding.converter_used || 'plain'}-${idx}`;
+                  const retestKey = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
                   const isExpanded = !!expandedRows[rowKey];
+                  const isRetestingThis = retestingKey === retestKey;
 
                   return (
                     <React.Fragment key={rowKey}>
                       <tr 
-                        className="cursor-pointer hover:bg-navy-800/50 transition-colors"
+                        className={`cursor-pointer transition-colors ${
+                          isRetestingThis
+                            ? 'bg-teal-950/40 animate-pulse'
+                            : 'hover:bg-navy-800/50'
+                        }`}
                         onClick={() => toggleRow(rowKey)}
                       >
                         <td className="text-slate-500">
@@ -334,24 +399,90 @@ export default function LiveScan() {
                             judgeCompletion={finding.judge_completion_tokens}
                           />
                         </td>
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            onClick={e => handleRetest(e, finding)}
+                            disabled={isRetestingThis}
+                            title="Re-send prompt vector to target LLM endpoint & re-evaluate judge verdict"
+                            className="btn-secondary text-[11px] py-1 px-2.5 inline-flex items-center gap-1.5 hover:border-teal-500 hover:text-teal-300 transition-all"
+                          >
+                            {isRetestingThis ? (
+                              <>
+                                <Spinner size={12} /> Retesting...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw size={12} className="text-teal-400" /> Retest
+                              </>
+                            )}
+                          </button>
+                        </td>
                       </tr>
 
                       {/* Expandable Turn Transcript / Details */}
                       {isExpanded && (
                         <tr className="bg-navy-950/80 border-b border-navy-800">
-                          <td colSpan={8} className="p-4 space-y-3">
+                          <td colSpan={9} className="p-4 space-y-3">
                             {!finding.full_transcript ? (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                                <div className="space-y-1">
-                                  <div className="font-semibold text-slate-400 flex items-center justify-between">
-                                    <span>Attack Prompt Sent:</span>
-                                    {finding.sent_prompt && finding.sent_prompt !== finding.prompt && (
-                                      <span className="text-[10px] text-teal-400">Obfuscated Variant</span>
-                                    )}
+                              <div className="space-y-1">
+                                  <div className="font-semibold text-slate-400 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span>Attack Prompt Sent:</span>
+                                      {finding.sent_prompt && finding.sent_prompt !== finding.prompt && (
+                                        <span className="text-[10px] text-teal-400">Obfuscated Variant</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      {editModeKeys.has(`${finding.payload_id}-${finding.converter_used || 'plain'}`) ? (
+                                        <button
+                                          type="button"
+                                          onClick={e => {
+                                            e.stopPropagation();
+                                            const k = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
+                                            setEditModeKeys(prev => { const s = new Set(prev); s.delete(k); return s; });
+                                            setEditingPrompts(prev => { const n = { ...prev }; delete n[k]; return n; });
+                                          }}
+                                          className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 px-1.5 py-0.5 rounded border border-navy-700 hover:border-slate-600 transition-colors"
+                                        >
+                                          <XIcon size={10} /> Cancel Edit
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={e => {
+                                            e.stopPropagation();
+                                            const k = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
+                                            setEditModeKeys(prev => new Set(prev).add(k));
+                                            setEditingPrompts(prev => ({ ...prev, [k]: finding.sent_prompt || finding.prompt || '' }));
+                                          }}
+                                          className="text-[10px] text-teal-400 hover:text-teal-300 flex items-center gap-1 px-1.5 py-0.5 rounded border border-teal-900/50 hover:border-teal-700 transition-colors"
+                                          title="Edit prompt before retesting"
+                                        >
+                                          <Pencil size={10} /> Edit Prompt
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="p-2.5 bg-navy-900 rounded font-mono text-slate-200 border border-navy-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
-                                    {finding.sent_prompt || finding.prompt}
-                                  </div>
+
+                                  {editModeKeys.has(`${finding.payload_id}-${finding.converter_used || 'plain'}`) ? (
+                                    <textarea
+                                      className="w-full p-2.5 bg-navy-900 rounded font-mono text-slate-100 border border-teal-700/60 text-xs resize-y min-h-[120px] max-h-64 focus:outline-none focus:ring-1 focus:ring-teal-500 transition-colors"
+                                      value={editingPrompts[`${finding.payload_id}-${finding.converter_used || 'plain'}`] ?? (finding.sent_prompt || finding.prompt || '')}
+                                      onClick={e => e.stopPropagation()}
+                                      onChange={e => {
+                                        const k = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
+                                        setEditingPrompts(prev => ({ ...prev, [k]: e.target.value }));
+                                      }}
+                                      spellCheck={false}
+                                      placeholder="Enter custom attack prompt..."
+                                    />
+                                  ) : (
+                                    <div className="p-2.5 bg-navy-900 rounded font-mono text-slate-200 border border-navy-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                      {finding.sent_prompt || finding.prompt}
+                                    </div>
+                                  )}
                                 </div>
 
                                 <div className="space-y-1">
@@ -371,6 +502,46 @@ export default function LiveScan() {
                                     </div>
                                   </div>
                                   <p className="text-slate-300">{finding.reasoning || 'No explanation recorded'}</p>
+                                </div>
+
+                                <div className="md:col-span-2 flex justify-end gap-2 pt-1">
+                                  {editModeKeys.has(`${finding.payload_id}-${finding.converter_used || 'plain'}`) && (
+                                    <button
+                                      type="button"
+                                      onClick={e => {
+                                        const k = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
+                                        handleRetest(e, finding, editingPrompts[k]);
+                                      }}
+                                      disabled={isRetestingThis}
+                                      className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-2 border-teal-500"
+                                    >
+                                      {isRetestingThis ? (
+                                        <>
+                                          <Spinner size={14} /> Retesting...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Pencil size={13} /> Retest with Edited Prompt
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={e => handleRetest(e, finding)}
+                                    disabled={isRetestingThis}
+                                    className="btn-secondary text-xs px-4 py-2 inline-flex items-center gap-2"
+                                  >
+                                    {isRetestingThis ? (
+                                      <>
+                                        <Spinner size={14} /> Retesting Target Endpoint...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RotateCw size={14} /> Re-send Original Prompt
+                                      </>
+                                    )}
+                                  </button>
                                 </div>
                               </div>
                             ) : (

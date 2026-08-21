@@ -87,6 +87,23 @@ def _load_pack_info(filepath: Path) -> Optional[PayloadPackInfo]:
         if not owasp_id:
             owasp_id = _owasp_id_from_stem(filepath.stem)
 
+        # Detect community origin from payload items or file path
+        source_val: Optional[str] = None
+        is_community = False
+        if "community" in str(filepath).lower():
+            is_community = True
+            source_val = "community-import"
+
+        for item in payloads_list:
+            item_source = str(item.get("source", ""))
+            if item_source:
+                if not source_val:
+                    source_val = item_source
+                if "community" in item_source.lower():
+                    is_community = True
+                    source_val = item_source
+                    break
+
         return PayloadPackInfo(
             name=filepath.stem,
             category=_category_from_stem(filepath.stem),
@@ -94,6 +111,8 @@ def _load_pack_info(filepath: Path) -> Optional[PayloadPackInfo]:
             count=count,
             file_path=str(filepath.relative_to(_PAYLOADS_DIR.parent.parent)),
             sample_payload=sample,
+            source=source_val,
+            is_community=is_community,
         )
     except Exception as exc:
         logger.warning(f"Failed to parse payload pack {filepath}: {exc}")

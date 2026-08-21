@@ -147,7 +147,7 @@ export default function Dashboard() {
       ) : (
         <>
           {/* Top KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <StatCard
               label="Total Scans Run"
               value={totalScans}
@@ -188,7 +188,7 @@ export default function Dashboard() {
             {/* Severity Distribution Donut */}
             <div className="card p-5 flex flex-col justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-white tracking-wide mb-1">Findings by Severity</h3>
+                <h3 className="text-sm font-bold text-white tracking-wide mb-1">Findings by Severity</h3>
                 <p className="text-xs text-slate-400 mb-4">Total breakdown across all vulnerabilities detected</p>
               </div>
               <div className="h-52 w-full flex items-center justify-center">
@@ -223,12 +223,12 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-navy-800">
                 {Object.entries(aggregatedSeverity).map(([sev, count]) => (
-                  <div key={sev} className="flex items-center justify-between text-xs px-2 py-1 bg-navy-950/60 rounded">
+                  <div key={sev} className="flex items-center justify-between text-xs px-2.5 py-1 bg-navy-950/60 rounded border border-navy-800/40">
                     <div className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full" style={{ background: SEVERITY_COLORS[sev] }} />
-                      <span className="text-slate-400">{sev}</span>
+                      <span className="text-slate-400 font-medium">{sev}</span>
                     </div>
-                    <span className="font-mono font-semibold text-white">{count}</span>
+                    <span className="font-mono font-bold text-white">{count}</span>
                   </div>
                 ))}
               </div>
@@ -237,7 +237,7 @@ export default function Dashboard() {
             {/* Recent Scans Performance Chart */}
             <div className="card p-5 lg:col-span-2 flex flex-col justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-white tracking-wide mb-1">Recent Scan Security Posture</h3>
+                <h3 className="text-sm font-bold text-white tracking-wide mb-1">Recent Scan Security Posture</h3>
                 <p className="text-xs text-slate-400 mb-4">Historical posture scores (0-100 scale) for recent scans</p>
               </div>
               <div className="h-56 w-full">
@@ -272,18 +272,18 @@ export default function Dashboard() {
           {/* Recent Scans Table */}
           <div className="card overflow-hidden">
             <div className="p-4 border-b border-navy-800 flex justify-between items-center bg-navy-900/50">
-              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Clock size={16} className="text-teal-400" />
-                Recent Scans
+                Recent Security Scans
               </h3>
               <button 
                 onClick={() => navigate('/reports')} 
-                className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1 font-medium"
+                className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1 font-semibold transition-colors"
               >
                 View all reports <ChevronRight size={13} />
               </button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="data-table-container border-none rounded-none">
               <table className="data-table">
                 <thead>
                   <tr>

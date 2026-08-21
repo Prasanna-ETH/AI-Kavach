@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from backend.api.routers import scans as scans_router
 from backend.api.routers import payloads as payloads_router
 from backend.api.routers import datasets as datasets_router
+from backend.api.routers import community as community_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +55,7 @@ app.add_middleware(
 app.include_router(scans_router.router)
 app.include_router(payloads_router.router)
 app.include_router(datasets_router.router)
+app.include_router(community_router.router)
 
 
 # ---------------------------------------------------------------------------

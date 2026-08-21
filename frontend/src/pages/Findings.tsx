@@ -5,7 +5,10 @@ import {
   ChevronDown, 
   ChevronRight, 
   Download, 
-  ShieldAlert 
+  ShieldAlert,
+  RefreshCw,
+  RotateCw,
+  CheckCircle2
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { Finding, ScanSummary } from '../types';
@@ -19,7 +22,8 @@ import {
   LoadingState, 
   EmptyState,
   TokenBadge,
-  TokenMetricsBanner
+  TokenMetricsBanner,
+  Spinner
 } from '../components';
 
 export default function Findings() {
@@ -29,8 +33,12 @@ export default function Findings() {
   const [scans, setScans] = useState<ScanSummary[]>([]);
   const [selectedScanId, setSelectedScanId] = useState<string>(scanId || '');
   const [findings, setFindings] = useState<Finding[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Retest state
+  const [retestingKey, setRetestingKey] = useState<string | null>(null);
+  const [retestMessage, setRetestMessage] = useState<string | null>(null);
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,6 +118,33 @@ export default function Findings() {
   const totalJudgeTokens = selectedScan?.total_judge_tokens ?? findings.reduce((acc, f) => acc + (f.judge_prompt_tokens || 0) + (f.judge_completion_tokens || 0), 0);
   const totalTokens = selectedScan?.total_tokens ?? (totalTargetTokens + totalJudgeTokens);
   const tokensSaved = selectedScan?.judge_tokens_saved ?? findings.filter(f => ['fast_prefilter', 'signature_engine', 'refusal_engine', 'heuristic'].includes(f.judge_type)).length * 280;
+
+  const handleRetest = async (e: React.MouseEvent, finding: Finding) => {
+    e.stopPropagation();
+    if (!selectedScanId) return;
+
+    const rowKey = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
+    try {
+      setRetestingKey(rowKey);
+      setRetestMessage(null);
+
+      const updated = await api.retestPayload(selectedScanId, finding.payload_id, {
+        prompt: finding.prompt,
+        converter_used: finding.converter_used,
+      });
+
+      setFindings(prev => prev.map(f => {
+        const k = `${f.payload_id}-${f.converter_used || 'plain'}`;
+        return k === rowKey ? updated : f;
+      }));
+
+      setRetestMessage(`Retest Complete: Payload ${finding.payload_id} — ${updated.vulnerable ? '🔴 Flagged Vulnerable' : '✅ Passed Security Evaluation'}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Retest request failed');
+    } finally {
+      setRetestingKey(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -264,7 +299,18 @@ export default function Findings() {
             <span className="font-mono text-[11px]">Click any row to expand full transcript & reasoning</span>
           </div>
 
-          <div className="overflow-x-auto">
+        {/* Notification Toast for Retest */}
+        {retestMessage && (
+          <div className="p-3 bg-teal-950/60 border border-teal-800 text-teal-300 text-xs rounded-lg flex items-center justify-between font-mono animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-teal-400 shrink-0" />
+              <span>{retestMessage}</span>
+            </div>
+            <button onClick={() => setRetestMessage(null)} className="text-slate-400 hover:text-white text-xs">Dismiss</button>
+          </div>
+        )}
+
+          <div className="data-table-container border-none rounded-none">
             <table className="data-table">
               <thead>
                 <tr>
@@ -277,18 +323,25 @@ export default function Findings() {
                   <th>Judge</th>
                   <th>Tokens</th>
                   <th>Converter</th>
+                  <th className="text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredFindings.map((finding, idx) => {
                   const rowKey = `${finding.payload_id}-${finding.converter_used || 'plain'}-${idx}`;
+                  const retestKey = `${finding.payload_id}-${finding.converter_used || 'plain'}`;
                   const isExpanded = !!expandedRows[rowKey];
+                  const isRetestingThis = retestingKey === retestKey;
 
                   return (
                     <React.Fragment key={rowKey}>
                       <tr
                         onClick={() => toggleRow(rowKey)}
-                        className="cursor-pointer hover:bg-navy-800/50 transition-colors"
+                        className={`cursor-pointer transition-colors ${
+                          isRetestingThis
+                            ? 'bg-teal-950/40 animate-pulse'
+                            : 'hover:bg-navy-800/50'
+                        }`}
                       >
                         <td className="text-slate-500">
                           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -343,12 +396,31 @@ export default function Findings() {
                             <span className="text-[10px] text-slate-500">Plain</span>
                           )}
                         </td>
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            onClick={e => handleRetest(e, finding)}
+                            disabled={isRetestingThis}
+                            title="Re-send prompt vector to target LLM endpoint & re-evaluate judge verdict"
+                            className="btn-secondary text-[11px] py-1 px-2.5 inline-flex items-center gap-1.5 hover:border-teal-500 hover:text-teal-300 transition-all"
+                          >
+                            {isRetestingThis ? (
+                              <>
+                                <Spinner size={12} /> Retesting...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw size={12} className="text-teal-400" /> Retest
+                              </>
+                            )}
+                          </button>
+                        </td>
                       </tr>
 
                       {/* Expanded Details Row */}
                       {isExpanded && (
                         <tr className="bg-navy-950/90 border-b border-navy-800">
-                          <td colSpan={9} className="p-5 space-y-4">
+                          <td colSpan={10} className="p-5 space-y-4">
                             {!finding.full_transcript ? (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                                 <div className="space-y-1.5">
@@ -384,6 +456,25 @@ export default function Findings() {
                                     </div>
                                   </div>
                                   <p className="text-slate-300 leading-relaxed">{finding.reasoning || 'No details provided'}</p>
+                                </div>
+
+                                <div className="md:col-span-2 flex justify-end pt-2">
+                                  <button
+                                    type="button"
+                                    onClick={e => handleRetest(e, finding)}
+                                    disabled={isRetestingThis}
+                                    className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-2"
+                                  >
+                                    {isRetestingThis ? (
+                                      <>
+                                        <Spinner size={14} /> Retesting Target Endpoint...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RotateCw size={14} /> Re-send Vector & Retest Target Endpoint
+                                      </>
+                                    )}
+                                  </button>
                                 </div>
                               </div>
                             ) : (

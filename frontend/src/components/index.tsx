@@ -1,4 +1,4 @@
-// Shared UI Components for LLM Sentinel Dashboard
+// Shared UI Components for Asfalis LLM Scanner
 import React from 'react';
 import { AlertCircle, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react';
 
@@ -158,12 +158,12 @@ export function SectionHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between mb-6">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div>
-        <h1 className="text-xl font-bold text-white">{title}</h1>
-        {subtitle && <p className="text-slate-400 text-sm mt-0.5">{subtitle}</p>}
+        <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">{title}</h1>
+        {subtitle && <p className="text-slate-400 text-xs sm:text-sm mt-0.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
   );
 }
@@ -184,13 +184,19 @@ export function StatCard({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="card p-5 flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</span>
-        {icon && <span className="text-slate-600">{icon}</span>}
+    <div className="card p-4 sm:p-5 flex flex-col justify-between card-hover relative overflow-hidden group">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+        {icon && (
+          <div className="p-2 rounded-lg bg-navy-950/80 border border-navy-800 text-teal-400 group-hover:border-teal-500/40 transition-colors">
+            {icon}
+          </div>
+        )}
       </div>
-      <span className={`text-3xl font-bold ${color}`}>{value}</span>
-      {sub && <span className="text-xs text-slate-500">{sub}</span>}
+      <div className="mt-2">
+        <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${color}`}>{value}</span>
+        {sub && <p className="text-xs text-slate-500 mt-1 truncate">{sub}</p>}
+      </div>
     </div>
   );
 }

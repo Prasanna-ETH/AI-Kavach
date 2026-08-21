@@ -201,6 +201,74 @@ class PayloadPackInfo(BaseModel):
     count: int
     file_path: str
     sample_payload: Optional[Dict[str, Any]] = None
+    source: Optional[str] = None
+    is_community: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Community Import schemas
+# ---------------------------------------------------------------------------
+
+class CommunityPreviewRequest(BaseModel):
+    raw_text: Optional[str] = Field(
+        None, description="Raw text pasted by user (JSON, CSV, or line-separated text)"
+    )
+
+
+class CommunityPreviewResponse(BaseModel):
+    detected_format: str  # 'csv' | 'json' | 'txt'
+    columns: Optional[List[str]] = None
+    sample_rows: List[Dict[str, Any]] = Field(default_factory=list)
+    total_count: int
+    suggested_mapping: Dict[str, str] = Field(default_factory=dict)
+    raw_text: Optional[str] = None
+
+
+class CommunityConvertRequest(BaseModel):
+    source_data: Optional[Any] = Field(
+        None, description="Raw row dicts or line list extracted during preview"
+    )
+    raw_text: Optional[str] = Field(
+        None, description="Full raw source text content if available"
+    )
+    max_records: Optional[int] = Field(
+        None, description="Max payloads to convert (None or 0 = ALL)"
+    )
+    detected_format: str = Field(..., description="'csv' | 'json' | 'txt'")
+    field_mapping: Dict[str, str] = Field(
+        default_factory=dict,
+        description="User-confirmed mapping: schema_field -> source_column",
+    )
+    default_category: str = Field("Community Payload Import", description="Default category")
+    default_owasp_id: str = Field("LLM01", description="Default OWASP ID")
+    default_severity: str = Field("HIGH", description="Default severity")
+    default_expected_vulnerable: Optional[bool] = Field(
+        True, description="Default expected_vulnerable ground truth"
+    )
+
+
+class CommunityConvertResponse(BaseModel):
+    yaml_content: str
+    total_count: int
+
+
+class CommunitySaveRequest(BaseModel):
+    pack_name: str = Field(
+        ..., description="Desired payload pack name (alphanumeric + underscore/hyphen)"
+    )
+    yaml_content: str = Field(..., description="Generated YAML string")
+    confirmed_large_import: bool = Field(
+        False, description="Flag acknowledging import of >500 payloads"
+    )
+
+
+class CommunitySaveResponse(BaseModel):
+    status: str
+    pack_name: str
+    output_path: str
+    count: int
+    message: str
+
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +305,12 @@ class EvalJudgeRequest(BaseModel):
     judge_model: str = Field("qwen2.5:3b")
     timeout: float = Field(30.0)
     output_dir: Optional[str] = Field(None)
+
+
+class RetestPayloadRequest(BaseModel):
+    payload_id: str = Field(..., description="Payload ID to retest (e.g. 'LLM01-001')")
+    prompt: Optional[str] = Field(None, description="Optional custom prompt text override")
+    converter_used: Optional[str] = Field(None, description="Optional converter name to apply")
 
 
 class EvalJudgeResponse(BaseModel):

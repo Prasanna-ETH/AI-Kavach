@@ -27,6 +27,7 @@ from backend.api.models import (
     BrowserTestSelectorsRequest,
     BrowserTestSelectorsResponse,
     FindingResponse,
+    RetestPayloadRequest,
     ScanCreateResponse,
     ScanRequest,
     ScanSummary,
@@ -602,3 +603,144 @@ async def get_json_report(scan_id: str):
         media_type="application/json",
         filename=f"scan_{scan_id[:8]}_report.json",
     )
+
+
+@router.post("/{scan_id}/retest", response_model=Dict[str, Any])
+async def retest_payload_in_scan(scan_id: str, request: RetestPayloadRequest):
+    """Retest a single security payload/prompt against the target endpoint and re-evaluate judge verdict."""
+    from scanner.models import Payload
+    from scanner.adapters.rest_adapter import RESTAdapter
+    from scanner.converters.registry import get_converter
+    from scanner.engine import ScanEngine
+
+    state = get_scan(scan_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Scan {scan_id} not found")
+
+    cfg = state.config
+
+    # Find existing finding in state.findings
+    target_idx = -1
+    existing_finding_dict: Optional[Dict[str, Any]] = None
+    for idx, f_dict in enumerate(state.findings):
+        p_id = str(f_dict.get("payload_id") or f_dict.get("payload", {}).get("id", ""))
+        conv = f_dict.get("converter_used")
+        if p_id == request.payload_id:
+            if request.converter_used is not None:
+                if conv == request.converter_used:
+                    target_idx = idx
+                    existing_finding_dict = f_dict
+                    break
+            else:
+                target_idx = idx
+                existing_finding_dict = f_dict
+                break
+
+    prompt_text = request.prompt
+    category = "prompt_injection"
+    owasp_id = "LLM01"
+    severity = "HIGH"
+    converter_name = request.converter_used
+
+    if existing_finding_dict:
+        if not prompt_text:
+            prompt_text = (
+                existing_finding_dict.get("original_prompt")
+                or existing_finding_dict.get("prompt")
+                or existing_finding_dict.get("payload", {}).get("prompt", "")
+            )
+        category = existing_finding_dict.get("category") or existing_finding_dict.get("payload", {}).get("category", category)
+        owasp_id = existing_finding_dict.get("owasp_id") or existing_finding_dict.get("payload", {}).get("owasp_id", owasp_id)
+        severity = existing_finding_dict.get("severity") or existing_finding_dict.get("payload", {}).get("severity", severity)
+        if not converter_name:
+            converter_name = existing_finding_dict.get("converter_used")
+
+    if not prompt_text:
+        raise HTTPException(status_code=400, detail="Prompt text could not be identified for retest.")
+
+    # Initialize Adapter
+    if getattr(cfg, "target_type", "rest") == "browser":
+        from scanner.adapters.browser_adapter import (
+            BrowserAdapter,
+            DEFAULT_INPUT_SELECTOR,
+            DEFAULT_SUBMIT_SELECTOR,
+            DEFAULT_RESPONSE_SELECTOR,
+        )
+        adapter = BrowserAdapter(
+            target_url=cfg.target_url,
+            input_selector=cfg.input_selector or DEFAULT_INPUT_SELECTOR,
+            send_button_selector=cfg.send_button_selector or DEFAULT_SUBMIT_SELECTOR,
+            response_selector=cfg.response_selector or DEFAULT_RESPONSE_SELECTOR,
+            wait_for_response_timeout=cfg.wait_for_response_timeout or 10.0,
+            login_config=cfg.login_config,
+        )
+    else:
+        body_template = cfg.body_template or (
+            '{"model": "qwen2.5:3b", "messages": [{"role": "user", "content": "{{PROMPT}}"}]}'
+        )
+        headers: Dict[str, str] = {"Content-Type": "application/json"}
+        if cfg.auth_header:
+            if ":" in cfg.auth_header:
+                h_key, h_val = cfg.auth_header.split(":", 1)
+                headers[h_key.strip()] = h_val.strip()
+            else:
+                headers["Authorization"] = cfg.auth_header.strip()
+
+        adapter = RESTAdapter(
+            url=cfg.target_url,
+            body_template=body_template,
+            response_field=cfg.response_field,
+            headers=headers,
+        )
+
+    try:
+        engine = ScanEngine(
+            adapter=adapter,
+            delay=0.0,
+            concurrency=1,
+            use_llm_judge=cfg.use_llm_judge,
+            ollama_url=cfg.ollama_url,
+            judge_model=cfg.judge_model,
+        )
+
+        payload = Payload(
+            id=request.payload_id,
+            category=category,
+            owasp_id=owasp_id,
+            prompt=prompt_text,
+            severity=severity,
+            requires_llm_judge=cfg.use_llm_judge,
+        )
+
+        prompt_to_send = prompt_text
+        if converter_name:
+            try:
+                converter_inst = get_converter(converter_name)
+                prompt_to_send = await converter_inst.transform(prompt_text)
+            except Exception as conv_err:
+                logger.warning(f"Failed to transform retest prompt with converter '{converter_name}': {conv_err}")
+
+        new_finding = await engine._send_and_judge(payload, prompt_to_send, converter_name=converter_name)
+        new_finding_dict = _finding_to_dict(new_finding)
+
+        # Update finding in state.findings if present
+        if target_idx >= 0:
+            state.findings[target_idx] = new_finding_dict
+        else:
+            state.findings.append(new_finding_dict)
+
+        # Recalculate stats
+        state.vulnerable_count = sum(1 for f in state.findings if f.get("vulnerable"))
+        state.total_target_tokens = sum(f.get("target_prompt_tokens", 0) + f.get("target_completion_tokens", 0) for f in state.findings)
+        state.total_tokens = sum(f.get("total_tokens", 0) for f in state.findings)
+
+        # Broadcast SSE retest event for live updates
+        state.broadcast_sse("retest_complete", {"payload_id": request.payload_id, "finding": new_finding_dict})
+
+        return new_finding_dict
+    finally:
+        if getattr(cfg, "target_type", "rest") == "browser":
+            try:
+                await adapter.close()
+            except Exception:
+                pass
