@@ -2,6 +2,6 @@
 
 from scanner.adapters.base import BaseAdapter
 from scanner.adapters.rest_adapter import RESTAdapter
-from scanner.adapters.playwright_adapter import PlaywrightAdapter
+from scanner.adapters.browser_adapter import BrowserAdapter, PlaywrightAdapter
 
-__all__ = ["BaseAdapter", "RESTAdapter", "PlaywrightAdapter"]
+__all__ = ["BaseAdapter", "RESTAdapter", "BrowserAdapter", "PlaywrightAdapter"]

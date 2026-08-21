@@ -865,7 +865,7 @@ def eval_judge(
     csv_path: Path = typer.Option(..., "--csv", help="Path to judge-comparison.csv dataset file"),
     sample_size: Optional[int] = typer.Option(None, "--sample-size", "-s", help="Random sample size for faster iteration"),
     ollama_url: str = typer.Option("http://localhost:11434/api/chat", "--ollama-url", help="Ollama API endpoint URL"),
-    judge_model: str = typer.Option("qwen2.5:3b", "--judge-model", help="Ollama LLM judge model name"),
+    judge_model: str = typer.Option("qwen2.5:0.5b", "--judge-model", help="Ollama LLM judge model name"),
     timeout: float = typer.Option(30.0, "--timeout", help="Timeout in seconds per LLM judge request"),
     output_dir: Path = typer.Option(Path("scan_results"), "--output-dir", "-o", help="Directory to save report files"),
 ) -> None:

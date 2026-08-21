@@ -234,9 +234,10 @@ class LLMJudge:
         self.timeout = timeout
         self.heuristic_judge = HeuristicJudge()
 
-    async def _call_ollama(self, prompt_text: str) -> str:
-        """Send a prompt to the Ollama chat endpoint and return the raw response content."""
-        return await call_local_ollama(
+    async def _call_ollama(self, prompt_text: str) -> Tuple[str, int, int]:
+        """Send a prompt to the Ollama chat endpoint and return (content, prompt_tokens, completion_tokens)."""
+        from scanner.common.ollama_client import call_local_ollama_with_usage
+        return await call_local_ollama_with_usage(
             prompt=prompt_text,
             model=self.model,
             ollama_url=self.ollama_url,
@@ -286,8 +287,10 @@ class LLMJudge:
         )
 
         # --- Attempt 1: Call Ollama and parse ---
+        j_prompt_tok = 0
+        j_comp_tok = 0
         try:
-            judge_reply = await self._call_ollama(prompt_text)
+            judge_reply, j_prompt_tok, j_comp_tok = await self._call_ollama(prompt_text)
         except Exception as err:
             error_detail = f"{type(err).__name__}: {err}" if str(err) else type(err).__name__
             response_preview = response_text[:200].replace("\n", " ")
@@ -316,7 +319,9 @@ class LLMJudge:
 
             retry_prompt = prompt_text + STRICT_RETRY_SUFFIX
             try:
-                judge_reply_retry = await self._call_ollama(retry_prompt)
+                judge_reply_retry, r_prompt_tok, r_comp_tok = await self._call_ollama(retry_prompt)
+                j_prompt_tok += r_prompt_tok
+                j_comp_tok += r_comp_tok
                 parsed = _try_parse_judge_json(judge_reply_retry)
             except Exception as err:
                 error_detail = f"Retry also failed — {type(err).__name__}: {err}" if str(err) else f"Retry also failed — {type(err).__name__}"
@@ -386,5 +391,7 @@ class LLMJudge:
             confidence=confidence,
             judge_type="llm",
             reasoning=reasoning,
+            judge_prompt_tokens=j_prompt_tok,
+            judge_completion_tokens=j_comp_tok,
         )
 

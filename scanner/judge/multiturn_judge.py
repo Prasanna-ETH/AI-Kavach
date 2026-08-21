@@ -173,7 +173,8 @@ async def judge_conversation(
     )
 
     try:
-        reply_text = await call_local_ollama(
+        from scanner.common.ollama_client import call_local_ollama_with_usage
+        reply_text, j_prompt_tok, j_comp_tok = await call_local_ollama_with_usage(
             prompt=prompt_text,
             model=model,
             ollama_url=ollama_url,
@@ -234,6 +235,8 @@ async def judge_conversation(
                 stop_condition_hint=payload.stop_condition_hint,
                 breached_vulnerabilities=breached_vulns,
                 breach_factors=breach_factors,
+                judge_prompt_tokens=j_prompt_tok,
+                judge_completion_tokens=j_comp_tok,
             )
     except Exception as err:
         logger.warning(f"Multi-turn judge LLM error: {err}")

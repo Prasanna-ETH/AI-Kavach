@@ -59,3 +59,5 @@ sources/*.bz2
 scratch/
 
 Skilland Contexts/
+
+.agents/

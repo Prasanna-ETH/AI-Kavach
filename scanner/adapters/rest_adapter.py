@@ -186,6 +186,7 @@ class RESTAdapter(BaseAdapter):
         self.headers = headers or {"Content-Type": "application/json"}
         self.timeout = timeout
         self.parsed_template = normalize_body_template(body_template)
+        self.last_usage: Optional[Tuple[int, int]] = None
 
     async def send(self, prompt: str) -> str:
         """Send prompt to target endpoint asynchronously using httpx AsyncClient.
@@ -200,6 +201,8 @@ class RESTAdapter(BaseAdapter):
         Returns:
             Extracted response text string.
         """
+        from scanner.common.tokens import extract_or_estimate_tokens
+
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             if "{{PROMPT}}" in self.url:
                 # GET Request with URL-encoded query parameter
@@ -226,9 +229,12 @@ class RESTAdapter(BaseAdapter):
             try:
                 data = response.json()
                 extracted = extract_dotted_path(data, self.response_field)
-                logger.debug(f"Received response from {self.url}: {extracted[:100]!r}")
+                self.last_usage = extract_or_estimate_tokens(data, prompt, extracted)
+                logger.debug(f"Received response from {self.url}: {extracted[:100]!r} (tokens: {self.last_usage})")
                 return extracted
             except Exception:
                 # If target returns plain text/HTML instead of JSON
-                logger.debug(f"Received plain-text response from {self.url}: {response.text[:100]!r}")
-                return response.text.strip()
+                text = response.text.strip()
+                self.last_usage = extract_or_estimate_tokens(None, prompt, text)
+                logger.debug(f"Received plain-text response from {self.url}: {text[:100]!r} (tokens: {self.last_usage})")
+                return text

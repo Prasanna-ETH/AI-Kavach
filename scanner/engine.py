@@ -131,6 +131,11 @@ class ScanEngine:
                 original_prompt=payload.prompt if converter_name else None,
                 likert_score=0,
                 sent_prompt=prompt_to_send,
+                target_prompt_tokens=0,
+                target_completion_tokens=0,
+                judge_prompt_tokens=0,
+                judge_completion_tokens=0,
+                total_tokens=0,
             )
         else:
             temp_payload = Payload(
@@ -157,11 +162,29 @@ class ScanEngine:
             finding.original_prompt = payload.prompt if converter_name else None
             finding.sent_prompt = prompt_to_send
 
+            # Extract or estimate target endpoint tokens
+            from scanner.common.tokens import estimate_tokens, extract_or_estimate_tokens
+            last_usage = getattr(self.adapter, "last_usage", None)
+            if last_usage:
+                finding.target_prompt_tokens, finding.target_completion_tokens = last_usage
+            else:
+                finding.target_prompt_tokens = estimate_tokens(prompt_to_send)
+                finding.target_completion_tokens = estimate_tokens(response_text)
+
+            finding.total_tokens = (
+                finding.target_prompt_tokens
+                + finding.target_completion_tokens
+                + (finding.judge_prompt_tokens or 0)
+                + (finding.judge_completion_tokens or 0)
+            )
+
         variant_label = converter_name if converter_name else "plain"
         logger.info(
             f"Variant [{variant_label}] evaluated for payload {payload.id} ({payload.category}) -> "
             f"judge={finding.judge_type}, likert={finding.likert_score}/4, vulnerable={finding.vulnerable}, "
-            f"reasoning={finding.reasoning[:120]!r}"
+            f"tokens(tgt={finding.target_prompt_tokens}+{finding.target_completion_tokens}, "
+            f"jdg={finding.judge_prompt_tokens}+{finding.judge_completion_tokens}, tot={finding.total_tokens}), "
+            f"reasoning={finding.reasoning[:100]!r}"
         )
         return finding
 
@@ -239,6 +262,18 @@ class ScanEngine:
         dist = calculate_likert_distribution(findings)
         posture_score, grade, category_scores = calculate_posture_score(findings)
 
+        total_target_tokens = sum((f.target_prompt_tokens + f.target_completion_tokens) for f in findings)
+        total_judge_tokens = sum((f.judge_prompt_tokens + f.judge_completion_tokens) for f in findings)
+        total_tokens = sum(f.total_tokens for f in findings)
+
+        # Estimate judge tokens saved whenever fast heuristic/signature filters short-circuited
+        from scanner.common.tokens import estimate_tokens
+        judge_tokens_saved = sum(
+            (estimate_tokens(f.sent_prompt or f.payload.prompt) + estimate_tokens(f.response_text) + 250)
+            for f in findings
+            if f.judge_type in ("fast_prefilter", "signature_engine", "refusal_engine", "heuristic")
+        )
+
         return ScanResult(
             target_url=target_url,
             start_time=start_time_iso,
@@ -251,6 +286,10 @@ class ScanEngine:
             posture_score=posture_score,
             grade=grade,
             category_scores=category_scores,
+            total_target_tokens=total_target_tokens,
+            total_judge_tokens=total_judge_tokens,
+            total_tokens=total_tokens,
+            judge_tokens_saved=judge_tokens_saved,
         )
 
     async def run_multiturn_scan(
@@ -284,16 +323,19 @@ class ScanEngine:
             )
 
             # Turn 1: Opening prompt
+            from scanner.common.tokens import estimate_tokens
             if progress_callback:
                 progress_callback(p_idx, total_payloads, payload, 1, max_turns, "Sending opening prompt...", None)
 
             start_t = time.time()
+            t1_prompt_tokens = estimate_tokens(payload.opening_prompt)
             transcript.append(
                 ConversationTurn(
                     turn_number=1,
                     role="attacker",
                     content=payload.opening_prompt,
                     timestamp=start_t,
+                    prompt_tokens=t1_prompt_tokens,
                 )
             )
             logger.info(f"[{payload.id}] Turn 1/{max_turns} [Attacker]: {payload.opening_prompt[:80]}...")
@@ -311,18 +353,23 @@ class ScanEngine:
                     full_transcript=transcript,
                     error=error,
                     likert_score=0,
+                    target_prompt_tokens=t1_prompt_tokens,
+                    target_completion_tokens=0,
+                    total_tokens=t1_prompt_tokens,
                 )
                 results.append(finding)
                 if progress_callback:
                     progress_callback(p_idx, total_payloads, payload, 1, max_turns, f"ERROR: {error}", finding)
                 continue
 
+            t1_resp_tokens = estimate_tokens(resp_text)
             transcript.append(
                 ConversationTurn(
                     turn_number=1,
                     role="target",
                     content=resp_text,
                     timestamp=time.time(),
+                    completion_tokens=t1_resp_tokens,
                 )
             )
             logger.info(f"[{payload.id}] Turn 1/{max_turns} [Target]: {resp_text[:80]}...")
@@ -355,12 +402,14 @@ class ScanEngine:
                     )
                     break
 
+                tn_prompt_tokens = estimate_tokens(next_prompt)
                 transcript.append(
                     ConversationTurn(
                         turn_number=turn_num,
                         role="attacker",
                         content=next_prompt,
                         timestamp=time.time(),
+                        prompt_tokens=tn_prompt_tokens,
                     )
                 )
                 logger.info(f"[{payload.id}] Turn {turn_num}/{max_turns} [Attacker]: {next_prompt[:80]}...")
@@ -375,12 +424,14 @@ class ScanEngine:
                     continue
 
                 consecutive_failures = 0
+                tn_resp_tokens = estimate_tokens(target_resp)
                 transcript.append(
                     ConversationTurn(
                         turn_number=turn_num,
                         role="target",
                         content=target_resp,
                         timestamp=time.time(),
+                        completion_tokens=tn_resp_tokens,
                     )
                 )
                 logger.info(f"[{payload.id}] Turn {turn_num}/{max_turns} [Target]: {target_resp[:80]}...")
@@ -408,6 +459,19 @@ class ScanEngine:
             )
 
             mt_finding.likert_score = 4 if mt_finding.vulnerable else 0
+
+            # Calculate total multi-turn target tokens
+            tot_tgt_prompt = sum(t.prompt_tokens for t in transcript if t.role == "attacker")
+            tot_tgt_comp = sum(t.completion_tokens for t in transcript if t.role == "target")
+            mt_finding.target_prompt_tokens = tot_tgt_prompt
+            mt_finding.target_completion_tokens = tot_tgt_comp
+            mt_finding.total_tokens = (
+                tot_tgt_prompt
+                + tot_tgt_comp
+                + (mt_finding.judge_prompt_tokens or 0)
+                + (mt_finding.judge_completion_tokens or 0)
+            )
+
             results.append(mt_finding)
 
             if progress_callback:

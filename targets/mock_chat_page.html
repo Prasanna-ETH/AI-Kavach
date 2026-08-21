@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mock AI Chat Interface</title>
+  <style>
+    body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
+    #chat-container { max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; }
+    #messages { min-height: 200px; border: 1px solid #333; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+    .message { margin: 8px 0; padding: 8px; border-radius: 4px; }
+    .user { background: #2a4365; color: #90cdf4; }
+    .assistant { background: #22543d; color: #9ae6b4; }
+    .input-row { display: flex; gap: 8px; }
+    #prompt-input { flex: 1; padding: 8px; background: #2d3748; color: #fff; border: 1px solid #4a5568; border-radius: 4px; }
+    #send-btn { padding: 8px 16px; background: #319795; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <h2>Mock AI Chatbot</h2>
+    <div id="messages">
+      <div class="message assistant">Hello! I am a test assistant. Ask me anything.</div>
+    </div>
+    <div class="input-row">
+      <input type="text" id="prompt-input" placeholder="Type your message here..." />
+      <button type="button" id="send-btn">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById('prompt-input');
+    const sendBtn = document.getElementById('send-btn');
+    const messages = document.getElementById('messages');
+
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      // Add user message
+      const userDiv = document.createElement('div');
+      userDiv.className = 'message user';
+      userDiv.textContent = 'User: ' + text;
+      messages.appendChild(userDiv);
+
+      input.value = '';
+
+      // Simulate AI response after 200ms
+      setTimeout(() => {
+        const botDiv = document.createElement('div');
+        botDiv.className = 'message assistant';
+        botDiv.textContent = 'Assistant: Echoing response for: ' + text;
+        messages.appendChild(botDiv);
+      }, 200);
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>

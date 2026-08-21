@@ -4,6 +4,37 @@
 
 Equipped with a **3-Tier Intelligent Hybrid Judge**, **0-to-4 Graduated Likert Severity Scoring**, **Dynamic Gitleaks & Microsoft Presidio PII/Secret Engine**, **RFC 2606 & RFC 1918 False-Positive Disambiguation**, **Universal Protocol Transport (POST JSON, GET Query Templating, Headless Playwright Browser with DOM Delta-Diffing)**, payload mutation converters (including **Story Mode** and **Multi-Layer Composite Obfuscation**), dynamic multi-turn red-teaming dialogue attacks, and executive dark-mode HTML audit reports with SARIF exports for CI/CD integration.
 
+
+---
+
+## 🖥️ Web Dashboard GUI (CTS Hackathon Demo)
+
+LLM Sentinel includes a high-performance web dashboard (FastAPI backend + React/Vite/Tailwind frontend) tailored for hackathon evaluations and live mentor demonstrations. The GUI wraps the existing scanner engine, judge modules, and payload library without duplicating any scanning logic.
+
+### 🚀 Running the Dashboard Locally
+
+#### 1. Start the FastAPI Backend API
+```bash
+# In project root:
+uv run uvicorn backend.api.main:app --reload --port 8000
+```
+* **API Documentation & Swagger UI**: http://localhost:8000/docs
+* **Health Check**: http://localhost:8000/health
+
+#### 2. Start the React/Vite Frontend
+```bash
+# In frontend/ directory:
+cd frontend
+npm install
+npm run dev
+```
+* **Dashboard URL**: http://localhost:5173
+
+#### 3. Branding Asset Slot
+To display your Cognizant/CTS logo in the header:
+* Place your logo image file at `frontend/public/cts-logo.png`
+* If the image is omitted, the clean text wordmark **"CTS Hackathon"** is automatically displayed as fallback.
+
 ---
 
 ## 🏛️ System Architecture
