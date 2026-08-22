@@ -12,7 +12,10 @@ import {
   ChevronDown, 
   ChevronRight, 
   Lock,
-  Sparkles
+  Sparkles,
+  KeyRound,
+  Cookie,
+  ShieldCheck
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { 
@@ -45,6 +48,7 @@ export default function NewScan() {
   const [bodyTemplate, setBodyTemplate] = useState('{"model": "qwen2.5:3b", "messages": [{"role": "user", "content": "{{PROMPT}}"}]}');
   const [responseField, setResponseField] = useState('message.content');
   const [authHeader, setAuthHeader] = useState('');
+  const [authType, setAuthType] = useState<'bearer' | 'cookie' | 'apikey' | 'custom' | ''>('');
 
   // Browser Target State
   const [browserUrl, setBrowserUrl] = useState('http://localhost:3000');
@@ -163,6 +167,7 @@ export default function NewScan() {
         response_selector: responseSelector.trim() || undefined,
         wait_for_response_timeout: Number(waitForResponseTimeout),
         login_config: loginConfig,
+        auth_header: authHeader.trim() || undefined,
       });
       setTestResult(res);
     } catch (err: unknown) {
@@ -202,7 +207,8 @@ export default function NewScan() {
         // REST fields
         body_template: targetType === 'rest' ? (bodyTemplate.trim() || undefined) : undefined,
         response_field: targetType === 'rest' ? responseField.trim() : undefined,
-        auth_header: targetType === 'rest' ? (authHeader.trim() || undefined) : undefined,
+        // Auth header works for BOTH REST and Browser targets
+        auth_header: authHeader.trim() || undefined,
         // Browser fields
         input_selector: targetType === 'browser' ? inputSelector.trim() : undefined,
         send_button_selector: targetType === 'browser' ? sendButtonSelector.trim() : undefined,
@@ -320,19 +326,6 @@ export default function NewScan() {
                 <p className="text-[11px] text-slate-500 mt-1">
                   Auto-detects standard LLM schemas (Ollama, OpenAI, Anthropic, Gemini).
                 </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Authorization Header (Optional)
-                </label>
-                <input
-                  type="text"
-                  className="input-base font-mono text-xs"
-                  value={authHeader}
-                  onChange={e => setAuthHeader(e.target.value)}
-                  placeholder="Bearer sk-your-token-here"
-                />
               </div>
 
               <div className="md:col-span-2">
@@ -588,6 +581,131 @@ export default function NewScan() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Authentication & Custom Headers Card */}
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center gap-2 border-b border-navy-800 pb-3">
+            <KeyRound size={16} className="text-teal-400" />
+            <div>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Authentication &amp; Custom Headers</h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Inject Bearer tokens, session cookies, API keys, or any HTTP header — applies to <span className="text-teal-400 font-semibold">both REST and Browser</span> targets.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick-fill preset buttons */}
+          <div className="space-y-3">
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Quick Presets</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setAuthType('bearer'); if (!authHeader.startsWith('Bearer ')) setAuthHeader('Bearer '); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border transition-all ${
+                  authType === 'bearer' ? 'bg-teal-500/15 border-teal-500 text-teal-300' : 'border-navy-700 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                }`}
+              >
+                <KeyRound size={12} /> Bearer Token
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthType('cookie'); if (!authHeader.startsWith('Cookie:')) setAuthHeader('Cookie: session_id='); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border transition-all ${
+                  authType === 'cookie' ? 'bg-teal-500/15 border-teal-500 text-teal-300' : 'border-navy-700 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                }`}
+              >
+                <Cookie size={12} /> Cookie / Session ID
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthType('apikey'); if (!authHeader.startsWith('X-API-Key:')) setAuthHeader('X-API-Key: '); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border transition-all ${
+                  authType === 'apikey' ? 'bg-teal-500/15 border-teal-500 text-teal-300' : 'border-navy-700 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                }`}
+              >
+                <ShieldCheck size={12} /> API Key Header
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthType('custom'); setAuthHeader(''); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border transition-all ${
+                  authType === 'custom' ? 'bg-teal-500/15 border-teal-500 text-teal-300' : 'border-navy-700 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                }`}
+              >
+                Custom Header
+              </button>
+              {authHeader && (
+                <button
+                  type="button"
+                  onClick={() => { setAuthType(''); setAuthHeader(''); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-red-500/40 text-red-400 hover:border-red-500 hover:text-red-300 transition-all"
+                >
+                  <XCircle size={12} /> Clear
+                </button>
+              )}
+            </div>
+
+            {/* Header Input */}
+            <div>
+              <input
+                type="text"
+                id="auth-header-input"
+                className="input-base font-mono text-xs"
+                value={authHeader}
+                onChange={e => { setAuthHeader(e.target.value); setAuthType('custom'); }}
+                placeholder={
+                  authType === 'bearer' ? 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' :
+                  authType === 'cookie' ? 'Cookie: session_id=abc123xyz; token=def456' :
+                  authType === 'apikey' ? 'X-API-Key: your-api-key-here' :
+                  'Bearer <token>  or  Cookie: session_id=<id>  or  X-API-Key: <key>'
+                }
+              />
+            </div>
+
+            {/* Live preview of what will be sent */}
+            {authHeader.trim() && (
+              <div className="flex items-start gap-2 bg-navy-950/60 border border-navy-700 rounded-lg px-3 py-2.5">
+                <CheckCircle2 size={13} className="text-emerald-400 mt-0.5 shrink-0" />
+                <div className="text-[11px] font-mono">
+                  <span className="text-slate-400">Header being sent → </span>
+                  {authHeader.includes(':') ? (
+                    <>
+                      <span className="text-yellow-300">{authHeader.split(':')[0].trim()}</span>
+                      <span className="text-slate-400">: </span>
+                      <span className="text-teal-300">{authHeader.split(':').slice(1).join(':').trim()}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-yellow-300">Authorization</span>
+                      <span className="text-slate-400">: </span>
+                      <span className="text-teal-300">{authHeader.trim()}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Format tips */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-500">
+              <div className="flex items-center gap-1.5">
+                <span className="text-teal-500">→</span>
+                <span><code className="text-slate-300">Bearer sk-xxxx</code> → sets <code className="text-slate-300">Authorization: Bearer sk-xxxx</code></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-teal-500">→</span>
+                <span><code className="text-slate-300">Cookie: sid=abc</code> → sets <code className="text-slate-300">Cookie: sid=abc</code></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-teal-500">→</span>
+                <span><code className="text-slate-300">X-API-Key: key</code> → sets <code className="text-slate-300">X-API-Key: key</code></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-teal-500">→</span>
+                <span>Any <code className="text-slate-300">Header-Name: value</code> format is supported</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* 2. Attack Mode Selection */}

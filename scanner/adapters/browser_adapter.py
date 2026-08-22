@@ -175,6 +175,7 @@ def _sync_validate_selectors(
     wait_ms: int,
     login_config: Optional[Dict[str, str]],
     headless: bool,
+    auth_header: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Synchronous validate_selectors — runs inside a thread via asyncio.to_thread()."""
     try:
@@ -196,6 +197,13 @@ def _sync_validate_selectors(
         browser = pw.chromium.launch(headless=headless)
         try:
             context = browser.new_context()
+            if auth_header and auth_header.strip():
+                ah = auth_header.strip()
+                if ":" in ah:
+                    hk, hv = ah.split(":", 1)
+                    context.set_extra_http_headers({hk.strip(): hv.strip()})
+                else:
+                    context.set_extra_http_headers({"Authorization": ah})
             page = context.new_page()
 
             logger.info(f"Validating selectors against: {target_url}")
@@ -315,6 +323,7 @@ def _sync_send(
     login_config: Optional[Dict[str, str]],
     headless: bool,
     logged_in_flag: list,  # mutable flag shared for login state [bool]
+    auth_header: Optional[str] = None,
 ) -> str:
     """Synchronous send — runs inside a thread via asyncio.to_thread()."""
     try:
@@ -329,6 +338,13 @@ def _sync_send(
         browser = pw.chromium.launch(headless=headless)
         try:
             context = browser.new_context()
+            if auth_header and auth_header.strip():
+                ah = auth_header.strip()
+                if ":" in ah:
+                    hk, hv = ah.split(":", 1)
+                    context.set_extra_http_headers({hk.strip(): hv.strip()})
+                else:
+                    context.set_extra_http_headers({"Authorization": ah})
             page = context.new_page()
 
             # Capture JSON responses from network for API-based targets
@@ -537,6 +553,7 @@ class BrowserAdapter(BaseAdapter):
         wait_for_response_timeout: float = 10.0,
         login_config: Optional[Dict[str, str]] = None,
         headless: bool = True,
+        auth_header: Optional[str] = None,
         # Backward compatibility aliases:
         url: Optional[str] = None,
         submit_selector: Optional[str] = None,
@@ -552,6 +569,7 @@ class BrowserAdapter(BaseAdapter):
         self.timeout = self.wait_for_response_timeout
         self.login_config = login_config
         self.headless = headless
+        self.auth_header = auth_header
         self._logged_in_flag = [False]  # mutable flag for login state across send() calls
 
         # Kept for API compatibility with old async tests that set these directly
@@ -589,6 +607,7 @@ class BrowserAdapter(BaseAdapter):
             self._wait_ms,
             self.login_config,
             self.headless,
+            self.auth_header,
         )
 
     async def send(self, prompt: str) -> str:
@@ -607,6 +626,7 @@ class BrowserAdapter(BaseAdapter):
             self.login_config,
             self.headless,
             self._logged_in_flag,
+            self.auth_header,
         )
 
 

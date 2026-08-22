@@ -87,6 +87,7 @@ async def _run_scan_task(scan_id: str) -> None:
                 response_selector=cfg.response_selector or DEFAULT_RESPONSE_SELECTOR,
                 wait_for_response_timeout=cfg.wait_for_response_timeout or 10.0,
                 login_config=cfg.login_config,
+                auth_header=cfg.auth_header,
             )
         else:
             body_template = cfg.body_template or (
@@ -469,6 +470,7 @@ async def test_selectors(request: BrowserTestSelectorsRequest):
         response_selector=request.response_selector or DEFAULT_RESPONSE_SELECTOR,
         wait_for_response_timeout=request.wait_for_response_timeout or 10.0,
         login_config=request.login_config,
+        auth_header=getattr(request, "auth_header", None),
     )
 
     try:
@@ -673,6 +675,7 @@ async def retest_payload_in_scan(scan_id: str, request: RetestPayloadRequest):
             response_selector=cfg.response_selector or DEFAULT_RESPONSE_SELECTOR,
             wait_for_response_timeout=cfg.wait_for_response_timeout or 10.0,
             login_config=cfg.login_config,
+            auth_header=cfg.auth_header,
         )
     else:
         body_template = cfg.body_template or (

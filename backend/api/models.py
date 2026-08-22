@@ -146,6 +146,10 @@ class BrowserTestSelectorsRequest(BaseModel):
         None,
         description="Optional login config dictionary",
     )
+    auth_header: Optional[str] = Field(
+        None,
+        description="Optional Authorization header or session cookie for browser health-check",
+    )
 
 
 class BrowserTestSelectorsResponse(BaseModel):

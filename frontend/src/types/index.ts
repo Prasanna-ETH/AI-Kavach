@@ -41,6 +41,7 @@ export interface BrowserTestSelectorsRequest {
   response_selector?: string;
   wait_for_response_timeout?: number;
   login_config?: Record<string, string>;
+  auth_header?: string;
 }
 
 export interface SelectorTestResult {
