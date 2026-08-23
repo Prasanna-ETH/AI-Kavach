@@ -112,7 +112,7 @@ export default function PayloadLibrary() {
               }`}
             >
               <div 
-                className="p-5 cursor-pointer flex flex-col justify-between h-full"
+                className="p-5 cursor-pointer flex flex-col justify-between min-h-[150px]"
                 onClick={() => toggleExpand(pack.name)}
               >
                 <div>
@@ -131,16 +131,24 @@ export default function PayloadLibrary() {
                   </div>
 
                   <h3 className="font-mono text-sm font-bold text-white mb-1 truncate" title={pack.name}>
-                    {pack.name}
+                    {pack.name === 'handwritten_quick_50' ? 'Handwritten Multi-Vector Suite (50)' :
+                     pack.name === 'jbb_jailbreak_50' ? 'JailbreakBench Harmful Suite (50)' :
+                     pack.name === 'jailbreak' ? 'Safety Jailbreak Baseline' :
+                     pack.name === 'multiturn_jailbreak' ? 'Multi-Turn Jailbreak Dialogue' :
+                     pack.name === 'prompt_injection' ? 'Prompt Injection Baseline' :
+                     pack.name === 'sensitive_data_leak' ? 'Sensitive Data Leakage Baseline' :
+                     pack.name === 'jbb_harmful' ? 'JailbreakBench Harmful Full' :
+                     pack.name === 'jbb_benign' ? 'JailbreakBench Benign Reference' :
+                     pack.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </h3>
                   <p className="text-xs text-slate-400 mb-3">{pack.category}</p>
                 </div>
 
                 <div className="pt-3 border-t border-navy-800 flex items-center justify-between text-xs text-slate-400">
-                  <span className="font-mono text-[11px] text-slate-500 truncate max-w-[200px]">
+                  <span className="font-mono text-[11px] text-slate-500 truncate max-w-[180px]" title={pack.file_path}>
                     {pack.file_path}
                   </span>
-                  <div className="flex items-center gap-1 text-teal-400 font-medium">
+                  <div className="flex items-center gap-1 text-teal-400 font-medium select-none">
                     {isExpanded ? (
                       <>Hide sample <ChevronDown size={14} /></>
                     ) : (
@@ -151,30 +159,38 @@ export default function PayloadLibrary() {
               </div>
 
               {/* Sample Payload Drawer */}
-              {isExpanded && pack.sample_payload && (
+              {isExpanded && (
                 <div className="p-5 bg-navy-950 border-t border-navy-800 text-xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-teal-400 flex items-center gap-1.5">
-                      <Code2 size={13} /> Sample Attack Vector
-                    </span>
-                    <SeverityBadge severity={pack.sample_payload.severity} />
-                  </div>
+                  {pack.sample_payload ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-teal-400 flex items-center gap-1.5">
+                          <Code2 size={13} /> Sample Attack Vector
+                        </span>
+                        <SeverityBadge severity={pack.sample_payload.severity} />
+                      </div>
 
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 uppercase font-mono">Payload ID:</span>
-                    <div className="font-mono text-xs text-slate-300">{pack.sample_payload.id}</div>
-                  </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-slate-500 uppercase font-mono">Payload ID:</span>
+                        <div className="font-mono text-xs text-slate-300">{pack.sample_payload.id}</div>
+                      </div>
 
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 uppercase font-mono">Prompt Text:</span>
-                    <div className="p-2.5 bg-navy-900 rounded font-mono text-xs text-slate-200 border border-navy-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
-                      {pack.sample_payload.prompt}
-                    </div>
-                  </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-slate-500 uppercase font-mono">Prompt Text:</span>
+                        <div className="p-2.5 bg-navy-900 rounded font-mono text-xs text-slate-200 border border-navy-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                          {pack.sample_payload.prompt}
+                        </div>
+                      </div>
 
-                  {pack.sample_payload.requires_llm_judge && (
-                    <div className="text-[11px] text-amber-400 bg-amber-950/30 px-2 py-1 rounded border border-amber-800/40">
-                      Requires LLM Judge evaluation for calibrated scoring
+                      {pack.sample_payload.requires_llm_judge && (
+                        <div className="text-[11px] text-amber-400 bg-amber-950/30 px-2 py-1 rounded border border-amber-800/40">
+                          Requires LLM Judge evaluation for calibrated scoring
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-slate-400 italic">
+                      No sample payload preview available for this pack ({pack.count} total vectors included).
                     </div>
                   )}
                 </div>

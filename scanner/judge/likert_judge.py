@@ -47,7 +47,7 @@ class LikertJudge:
         self,
         ollama_url: str = "http://localhost:11434/api/chat",
         model: str = "qwen2.5:3b",
-        timeout: float = 30.0,
+        timeout: float = 90.0,
     ) -> None:
         """Initialize LikertJudge.
 

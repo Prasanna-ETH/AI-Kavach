@@ -938,10 +938,19 @@ export default function NewScan() {
                           </div>
                         </div>
                         <div className="font-mono text-xs text-slate-200 font-semibold truncate" title={pack.name}>
-                          {pack.name}
+                          {pack.name === 'handwritten_quick_50' ? 'Handwritten Multi-Vector (50)' :
+                           pack.name === 'jbb_jailbreak_50' ? 'JailbreakBench Harmful (50)' :
+                           pack.name === 'jailbreak' ? 'Safety Jailbreak Baseline' :
+                           pack.name === 'multiturn_jailbreak' ? 'Multi-Turn Jailbreak Dialogue' :
+                           pack.name === 'prompt_injection' ? 'Prompt Injection Baseline' :
+                           pack.name === 'sensitive_data_leak' ? 'Sensitive Data Leak Baseline' :
+                           pack.name === 'jbb_harmful' ? 'JailbreakBench Harmful Full' :
+                           pack.name === 'jbb_benign' ? 'JailbreakBench Benign Ref' :
+                           pack.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </div>
                         <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
                           <span>{pack.count} vectors</span>
+                          <span className="font-mono text-[10px] text-slate-500">{pack.name}</span>
                         </div>
                       </div>
                     );

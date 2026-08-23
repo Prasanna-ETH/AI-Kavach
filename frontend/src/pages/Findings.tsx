@@ -23,6 +23,7 @@ import {
   EmptyState,
   TokenBadge,
   TokenMetricsBanner,
+  ConfidenceBadge,
   Spinner
 } from '../components';
 
@@ -365,7 +366,10 @@ export default function Findings() {
                           </div>
                         </td>
                         <td>
-                          <LikertScore score={finding.likert_score} />
+                          <div className="flex flex-col gap-1 items-start">
+                            <LikertScore score={finding.likert_score} />
+                            <ConfidenceBadge confidence={finding.confidence} />
+                          </div>
                         </td>
                         <td>
                           <div className="flex items-center gap-1.5">
@@ -446,9 +450,12 @@ export default function Findings() {
 
                                 <div className="md:col-span-2 p-3.5 bg-navy-900/60 rounded border border-navy-800 text-xs">
                                   <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold text-teal-400">
-                                      Judge Evaluation Reasoning ({finding.judge_type}):
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-teal-400">
+                                        Judge Evaluation Reasoning ({finding.judge_type}):
+                                      </span>
+                                      <ConfidenceBadge confidence={finding.confidence} />
+                                    </div>
                                     <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
                                       <span>Target: <strong className="text-slate-200">{(finding.target_prompt_tokens || 0) + (finding.target_completion_tokens || 0)}</strong> (p:{finding.target_prompt_tokens || 0}, c:{finding.target_completion_tokens || 0})</span>
                                       <span>Judge: <strong className="text-amber-400">{(finding.judge_prompt_tokens || 0) + (finding.judge_completion_tokens || 0)}</strong> (p:{finding.judge_prompt_tokens || 0}, c:{finding.judge_completion_tokens || 0})</span>

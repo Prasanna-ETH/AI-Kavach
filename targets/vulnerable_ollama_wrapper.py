@@ -362,7 +362,7 @@ async def chat_endpoint(request: Request) -> JSONResponse:
 
     # 1. Attempt real Ollama neural generation
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=30.0, read=300.0)) as client:
             resp = await client.post(OLLAMA_REAL_URL, json=payload_for_ollama)
             if resp.status_code == 200:
                 data = resp.json()

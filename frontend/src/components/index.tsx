@@ -73,6 +73,28 @@ export function LikertScore({ score }: { score: number }) {
   );
 }
 
+// ─── Confidence Badge ─────────────────────────────────────────────────────────
+
+export function ConfidenceBadge({ confidence }: { confidence?: number }) {
+  if (confidence === undefined || confidence === null) return null;
+  const pct = Math.round(confidence > 1 ? confidence : confidence * 100);
+  let bgClass = "bg-emerald-950/60 text-emerald-400 border-emerald-800/40";
+  if (pct < 75) {
+    bgClass = "bg-amber-950/60 text-amber-400 border-amber-800/40";
+  } else if (pct < 90) {
+    bgClass = "bg-teal-950/60 text-teal-300 border-teal-800/40";
+  }
+
+  return (
+    <span 
+      className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${bgClass}`}
+      title={`Judge Confidence Score: ${pct}%`}
+    >
+      {pct}% conf
+    </span>
+  );
+}
+
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
 export function ProgressBar({ progress, total }: { progress: number; total: number }) {
