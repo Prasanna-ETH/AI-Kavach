@@ -45,19 +45,24 @@ htmlcov/
 # Generated scan outputs & logs
 scan_results/
 *.log
+proof_of_fix_artifact.json
+results.sarif
+junit.xml
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
-# Raw datasets (keep scanner/payloads/*.yaml committed)
+# Raw datasets & temporary notes (kept clean for AI Kavach)
 dataset/
 *.csv
-sources/*.jsonl*
-sources/*.parquet*
-sources/*.bz2
+sources/
 scratch/
-
+Sample codes/
 Skilland Contexts/
-
-.agents/
+pdf for studying/
+test payloads/
+CHANGELOG.md
+PROJECT_WORKFLOW.md
+summary.md
+test.md

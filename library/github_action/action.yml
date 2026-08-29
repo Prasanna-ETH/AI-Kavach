@@ -1,0 +1,51 @@
+name: 'Asfalis LLM Sentinel Security Audit'
+description: 'Automated AI/LLM Security Audit & Vulnerability Scanner for CI/CD Pipelines'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  target-url:
+    description: 'Target LLM REST or Browser endpoint URL (e.g. http://localhost:5000/chat)'
+    required: true
+  target-type:
+    description: 'Target type: rest or browser'
+    required: false
+    default: 'rest'
+  fail-on:
+    description: 'Minimum severity to fail the build: CRITICAL, HIGH, MEDIUM, LOW, or NONE'
+    required: false
+    default: 'HIGH'
+  auth-header:
+    description: 'Optional Authorization header'
+    required: false
+    default: ''
+  sarif-out:
+    description: 'Output SARIF path for GitHub Code Scanning'
+    required: false
+    default: 'results.sarif'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install httpx pyyaml pydantic
+
+    - name: Run LLM Security Audit
+      shell: bash
+      run: |
+        python -m library.cli_hook \
+          --target-url "${{ inputs.target-url }}" \
+          --target-type "${{ inputs.target-type }}" \
+          --fail-on "${{ inputs.fail-on }}" \
+          --auth-header "${{ inputs.auth-header }}" \
+          --sarif-out "${{ inputs.sarif-out }}" \
+          --markdown-out "$GITHUB_STEP_SUMMARY"

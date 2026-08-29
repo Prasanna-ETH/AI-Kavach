@@ -4,6 +4,8 @@ A comprehensive technical reference manual and workflow documentation for the **
 
 ---
 
+
+
 ## 1. Overview
 
 The **LLM Security Scanner** is an automated, asynchronous black-box and grey-box security assessment framework engineered specifically to audit Large Language Model (LLM) REST API endpoints and web-based conversational interfaces for safety guardrail bypasses and adversarial vulnerabilities. Mapped directly to the **OWASP Top 10 for LLM Applications**, the scanner dispatches thousands of tailored security probes—spanning direct prompt injections, credential/PII harvesting, alignment jailbreaks, system prompt extractions, obfuscated evasion transformations, and multi-turn conversational social engineering—against target models. Utilizing a high-performance **3-Tier Hybrid Evaluation Engine** (combining deterministic signature matching, multi-lingual safety refusal engines, and local LLM-as-a-Judge reasoning with graduated Likert 0–4 scoring), the scanner quantifies an AI application's defensive posture, calculates an overall security posture score (0–100.0) with letter grades (A through F), and generates both interactive HTML and machine-readable JSON audit reports.

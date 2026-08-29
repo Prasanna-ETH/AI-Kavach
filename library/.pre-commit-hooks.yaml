@@ -1,0 +1,8 @@
+- id: llm-sentinel-scan
+  name: Asfalis LLM Sentinel AI Security Audit
+  description: Automatically audit local LLM endpoints for prompt injection and sensitive data leaks before committing code.
+  entry: python -m library.cli_hook
+  language: python
+  types: [python]
+  pass_filenames: false
+  args: ["--target-url", "http://localhost:5000/chat", "--limit", "10", "--fail-on", "HIGH"]

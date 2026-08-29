@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asfalis-llm-sentinel"
+version = "2.2.0"
+description = "Enterprise AI/LLM Security Auditor & Vulnerability Scanner for CI/CD Integration"
+readme = "README.md"
+authors = [{ name = "Asfalis Sentinel Red Team", email = "sec-ops@asfalis.io" }]
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "httpx>=0.24.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+]
+
+[project.scripts]
+llm-sentinel = "library.cli_hook:main"
