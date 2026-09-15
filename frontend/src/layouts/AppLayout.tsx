@@ -12,7 +12,6 @@ import {
   Shield,
   Menu,
   X,
-  Radio
 } from 'lucide-react';
 
 const navItems = [
@@ -136,34 +135,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Menu size={20} />
             </button>
 
-            {/* CTS logo & badge */}
+            {/* Product branding */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <img
-                src="/cts-logo.png"
-                alt="CTS"
-                className="h-6 sm:h-7 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <div className="p-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-400 md:hidden">
+                <Shield size={16} />
+              </div>
               <span className="text-sm sm:text-base font-extrabold tracking-tight text-white">
-                CTS Hackathon
+                LLM Sentinel
               </span>
               <span
                 className="hidden sm:inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full border border-teal-500/30"
                 style={{ background: 'rgba(20,184,166,0.12)', color: 'var(--teal-400)' }}
               >
-                AI LLM Scanner
+                AI Security Scanner
               </span>
             </div>
           </div>
 
           {/* Right side status indicators */}
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-navy-950 border border-navy-800 text-xs text-slate-400">
-              <Radio size={12} className="text-teal-400" />
-              <span>Demo Mode</span>
-            </div>
 
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-800/40 text-xs text-emerald-400 font-medium">
               <div className="w-2 h-2 rounded-full bg-emerald-400 live-dot" />

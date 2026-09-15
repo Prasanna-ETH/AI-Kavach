@@ -22,10 +22,11 @@ logging.basicConfig(
 )
 
 app = FastAPI(
-    title="LLM Sentinel Dashboard API",
+    title="LLM Security Scanner API",
     description=(
-        "REST + SSE API wrapping the LLM Sentinel scanner engine "
-        "for the CTS Hackathon demo dashboard (v2.1 with Playwright support)."
+        "REST + SSE API powering the LLM Security Scanner dashboard. "
+        "Supports single-turn and multi-turn adversarial scanning with "
+        "Playwright browser automation and a 3-tier hybrid evaluation engine."
     ),
     version="1.1.0",
     docs_url="/docs",

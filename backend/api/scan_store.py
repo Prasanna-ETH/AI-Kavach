@@ -1,7 +1,7 @@
 """In-memory scan registry for the LLM Sentinel Dashboard API.
 
 Stores scan state, live findings, SSE queues, and final results.
-No external database required — designed for local hackathon demo use.
+No external database required — in-memory store for lightweight, stateless deployment.
 """
 
 from __future__ import annotations
