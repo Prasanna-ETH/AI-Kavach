@@ -60,7 +60,7 @@ You can deploy the backend to Render using either **Option A (Native Python Web 
    - **Runtime**: `Python 3`
    - **Build Command**:
      ```bash
-     pip install -r requirements.txt && pip install -e .
+     pip install -r requirements.txt
      ```
    - **Start Command**:
      ```bash
@@ -73,6 +73,7 @@ You can deploy the backend to Render using either **Option A (Native Python Web 
    | Key | Value | Notes |
    |---|---|---|
    | `PYTHON_VERSION` | `3.11.9` | Ensures modern Python runtime |
+   | `PYTHONPATH` | `.` | Ensures scanner and backend packages resolve |
    | `CORS_ORIGINS` | `*` | Or specify your Vercel URL once created |
 
 6. Click **Create Web Service**.

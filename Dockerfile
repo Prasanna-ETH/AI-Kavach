@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy entire application (including scanner package, payloads, backend, etc.)
 COPY . .
 
-# Install scanner package in editable mode
-RUN pip install --no-cache-dir -e .
+# Set python path so scanner and backend modules are discoverable
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
