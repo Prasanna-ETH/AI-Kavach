@@ -32,17 +32,30 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+import os
+
 # ---------------------------------------------------------------------------
-# CORS — allow the Vite dev server (localhost:5173) and any localhost port
+# CORS — allow Vite dev server, configurable origins, and any Vercel domain
 # ---------------------------------------------------------------------------
+_default_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+]
+
+_env_cors = os.environ.get("CORS_ORIGINS", "").strip()
+if _env_cors == "*":
+    _allowed_origins = ["*"]
+elif _env_cors:
+    _allowed_origins = list(set(_default_origins + [origin.strip() for origin in _env_cors.split(",") if origin.strip()]))
+else:
+    _allowed_origins = _default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=_allowed_origins,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

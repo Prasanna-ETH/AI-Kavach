@@ -18,8 +18,17 @@ logger = logging.getLogger("sentinel.api.payloads")
 
 router = APIRouter(prefix="/api/payload-packs", tags=["payloads"])
 
-# Root of the payloads directory (relative to project root, resolved at startup)
-_PAYLOADS_DIR = Path(__file__).parents[3] / "scanner" / "payloads"
+import os
+from scanner.config import PAYLOADS_DIR as _DEFAULT_PAYLOADS_DIR
+
+# Root of the payloads directory (robust resolution supporting container, installed package, and repo root)
+_env_payloads = os.environ.get("PAYLOADS_DIR")
+if _env_payloads and Path(_env_payloads).exists():
+    _PAYLOADS_DIR = Path(_env_payloads)
+elif _DEFAULT_PAYLOADS_DIR.exists():
+    _PAYLOADS_DIR = _DEFAULT_PAYLOADS_DIR
+else:
+    _PAYLOADS_DIR = Path(__file__).parents[3] / "scanner" / "payloads"
 
 
 def _owasp_id_from_stem(stem: str) -> str:

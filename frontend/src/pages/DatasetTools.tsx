@@ -60,7 +60,7 @@ export default function DatasetTools() {
   const [defaultCategory, setDefaultCategory] = useState('Community Payload Import');
   const [defaultOwaspId, setDefaultOwaspId] = useState('LLM01');
   const [defaultSeverity, setDefaultSeverity] = useState('HIGH');
-  const [defaultExpectedVulnerable, setDefaultExpectedVulnerable] = useState<boolean>(true);
+  const [defaultExpectedVulnerable] = useState<boolean>(true);
   const [importCountOption, setImportCountOption] = useState<string>('ALL');
   const [customCount, setCustomCount] = useState<string>('500');
 

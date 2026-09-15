@@ -32,8 +32,17 @@ logger = logging.getLogger("sentinel.api.community")
 
 router = APIRouter(prefix="/api/payloads/community", tags=["community-payloads"])
 
-# Root of payloads directory
-_PAYLOADS_DIR = Path(__file__).parents[3] / "scanner" / "payloads"
+import os
+from scanner.config import PAYLOADS_DIR as _DEFAULT_PAYLOADS_DIR
+
+# Root of payloads directory (robust resolution supporting container, installed package, and repo root)
+_env_payloads = os.environ.get("PAYLOADS_DIR")
+if _env_payloads and Path(_env_payloads).exists():
+    _PAYLOADS_DIR = Path(_env_payloads)
+elif _DEFAULT_PAYLOADS_DIR.exists():
+    _PAYLOADS_DIR = _DEFAULT_PAYLOADS_DIR
+else:
+    _PAYLOADS_DIR = Path(__file__).parents[3] / "scanner" / "payloads"
 _COMMUNITY_DIR = _PAYLOADS_DIR / "community"
 
 

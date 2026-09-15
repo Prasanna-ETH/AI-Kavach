@@ -1,0 +1,18 @@
+# Core API & Web Server
+fastapi>=0.110.0
+uvicorn>=0.28.0
+pydantic>=2.6.0
+
+# HTTP, Async & Browser Automation
+httpx>=0.27.0
+playwright>=1.62.0
+
+# CLI & Configuration
+typer>=0.12.0
+pyyaml>=6.0.1
+jinja2>=3.1.3
+rich>=13.7.1
+
+# Testing
+pytest>=8.1.0
+pytest-asyncio>=0.23.5

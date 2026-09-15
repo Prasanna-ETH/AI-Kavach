@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: llm-security-scanner-api
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt && pip install -e .
+    startCommand: uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: CORS_ORIGINS
+        value: "*"

@@ -1,6 +1,6 @@
 // App layout: responsive sidebar drawer + top header + main content area
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Plus,
@@ -27,7 +27,6 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const location = useLocation();
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--navy-950)' }}>

@@ -58,7 +58,12 @@ async def import_behaviors(request: DatasetImportRequest):
     if request.output_dir:
         out_dir = Path(request.output_dir)
     else:
-        out_dir = Path(__file__).parents[3] / "scanner" / "payloads" / "handwritten"
+        import os
+        from scanner.config import PAYLOADS_DIR as _DEFAULT_PAYLOADS_DIR
+        _p_dir = Path(os.environ.get("PAYLOADS_DIR", str(_DEFAULT_PAYLOADS_DIR)))
+        if not _p_dir.exists():
+            _p_dir = Path(__file__).parents[3] / "scanner" / "payloads"
+        out_dir = _p_dir / "handwritten"
 
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{request.output_pack_name}.yaml"

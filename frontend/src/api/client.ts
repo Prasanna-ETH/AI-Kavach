@@ -7,7 +7,10 @@ import type {
   EvalJudgeResponse 
 } from '../types';
 
-const BASE = '/api';
+// If VITE_API_URL is provided (e.g. deployed on Vercel connecting to Render backend),
+// prepend it. Otherwise, fall back to '/api' (proxied by Vite in local dev).
+const API_SERVER = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const BASE = API_SERVER ? `${API_SERVER}/api` : '/api';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -99,7 +102,7 @@ export const api = {
     if (data.file) {
       const formData = new FormData();
       formData.append('file', data.file);
-      const res = await fetch('/api/payloads/community/preview', {
+      const res = await fetch(`${BASE}/payloads/community/preview`, {
         method: 'POST',
         body: formData,
       });
@@ -162,8 +165,8 @@ export const api = {
     }),
 
   // Report URLs (FileResponse — use anchor href)
-  reportHtmlUrl: (id: string) => `/api/scans/${id}/report/html`,
-  reportJsonUrl: (id: string) => `/api/scans/${id}/report/json`,
+  reportHtmlUrl: (id: string) => `${BASE}/scans/${id}/report/html`,
+  reportJsonUrl: (id: string) => `${BASE}/scans/${id}/report/json`,
 };
 
 // ─── SSE hook helper ──────────────────────────────────────────────────────────
@@ -177,7 +180,7 @@ export function openScanStream(
   onEvent: (eventType: string, data: Record<string, unknown>) => void,
   onClose?: () => void
 ): () => void {
-  const es = new EventSource(`/api/scans/${scanId}/stream`);
+  const es = new EventSource(`${BASE}/scans/${scanId}/stream`);
 
   es.onmessage = (e) => {
     try {
