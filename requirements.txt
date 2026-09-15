@@ -2,6 +2,7 @@
 fastapi>=0.110.0
 uvicorn>=0.28.0
 pydantic>=2.6.0
+python-multipart>=0.0.9
 
 # HTTP, Async & Browser Automation
 httpx>=0.27.0
