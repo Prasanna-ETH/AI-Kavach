@@ -238,8 +238,7 @@ Clone the repository and install dependencies:
 
 ```bash
 # Clone repository
-git clone https://github.com/Prasanna-ETH/Final-CTS---AI-LLM-Scanner.git
-cd Final-CTS---AI-LLM-Scanner
+https://github.com/Prasanna-ETH/Asfalis_LLM_Scanenr.git
 
 # Install Python dependencies using uv (recommended)
 uv sync
